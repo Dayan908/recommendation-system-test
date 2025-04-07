@@ -29,8 +29,23 @@ current_step = "步驟零"
 
 def load_excel_data():
     try:
-        file_path = 'GPTdata0911.xlsx'
+        file_path = 'GPTdata0325.xlsx'
+        if not os.path.exists(file_path):
+            logging.error(f"找不到檔案: {file_path}")
+            raise FileNotFoundError(f"找不到檔案: {file_path}")
+        
         df = pd.read_excel(file_path)
+        if df.empty:
+            logging.error("Excel 檔案是空的")
+            raise ValueError("Excel 檔案是空的")
+            
+        required_columns = ['產品名稱', '公司名稱', '公司地址', '連絡電話', '產品網址', 
+                          '主要功能', '使用方式', '產品第一層分類', '產品第二層分類']
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            logging.error(f"Excel 檔案缺少必要欄位: {', '.join(missing_columns)}")
+            raise ValueError(f"Excel 檔案缺少必要欄位: {', '.join(missing_columns)}")
+            
         logging.info("成功載入Excel數據")
         return df
     except Exception as e:
