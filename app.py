@@ -269,7 +269,7 @@ with gr.Blocks(
 ) as demo:
     with gr.Row(elem_classes="header"):
         with gr.Column(scale=1):
-            logo = gr.Image("GRC.png", elem_id="logo", width=150)
+            logo = gr.Image("GRC.png", elem_id="logo", width=150, show_label=False)
         with gr.Column(scale=6):
             gr.Markdown("# **智慧照顧產品推薦系統**")
         with gr.Column(scale=2, elem_classes="disclaimer"):
@@ -282,13 +282,13 @@ with gr.Blocks(
 
     with gr.Row():
         with gr.Column(scale=12, elem_classes="chat-container"):
-            chatbot = gr.Chatbot(height=450, elem_classes="chatbot")
+            chatbot = gr.Chatbot(height=450, elem_classes="chatbot", show_label=False)
         with gr.Column(scale=4, elem_classes="input-container"):
             user_input = gr.Textbox(
-                label="您的訊息",
                 placeholder="請輸入您的需求...",
-                lines=2,
-                show_label=False
+                show_label=False,
+                interactive=True,
+                lines=1
             )
             email = gr.Textbox(
                 label="電子郵件",
