@@ -187,50 +187,122 @@ def gradio_interface(user_input, email, state):
 
 # Gradio Blocks UI
 with gr.Blocks(
+    theme=gr.themes.Soft(),  # 使用柔和主題
     css="""
-    #logo img { box-shadow: none; border: none; }
-    .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-    .header { text-align: center; margin-bottom: 30px; }
-    .chat-container { height: 500px; overflow-y: auto; }
-    .input-container { margin-top: 20px; }
-    .button-container { margin-top: 10px; }
-    .disclaimer { font-size: 0.8em; color: #666; margin-top: 10px; }
+    /* 整體容器 */
+    .container { 
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #f8f9fa;
+        border-radius: 15px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    
+    /* 標題樣式 */
+    .header { 
+        text-align: center;
+        margin-bottom: 30px;
+        padding: 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 10px;
+        color: white;
+    }
+    
+    /* 聊天容器 */
+    .chat-container { 
+        height: 500px;
+        overflow-y: auto;
+        padding: 20px;
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    }
+    
+    /* 輸入區域 */
+    .input-container { 
+        margin-top: 20px;
+        padding: 15px;
+        background: white;
+        border-radius: 10px;
+    }
+    
+    /* 按鈕容器 */
+    .button-container { 
+        display: flex;
+        gap: 10px;
+        margin-top: 10px;
+    }
+    
+    /* 按鈕樣式 */
+    .button-primary {
+        background: #4CAF50 !important;
+        border: none !important;
+        color: white !important;
+    }
+    
+    .button-secondary {
+        background: #f44336 !important;
+        border: none !important;
+        color: white !important;
+    }
+    
+    /* Logo 樣式 */
+    #logo img { 
+        max-width: 150px;
+        border-radius: 10px;
+        box-shadow: none;
+        border: none;
+    }
+    
+    /* 免責聲明 */
+    .disclaimer { 
+        font-size: 0.9em;
+        color: #666;
+        margin-top: 15px;
+        padding: 10px;
+        background: #fff3cd;
+        border-left: 4px solid #ffc107;
+        border-radius: 4px;
+    }
     """
 ) as demo:
-    with gr.Row():
+    with gr.Row(elem_classes="header"):
         with gr.Column(scale=1):
-            logo = gr.Image("GRC.png", elem_id="logo")
+            logo = gr.Image("GRC.png", elem_id="logo", width=150)
         with gr.Column(scale=6):
             gr.Markdown("# **智慧照顧產品推薦系統**")
-        with gr.Column(scale=2):
+        with gr.Column(scale=2, elem_classes="disclaimer"):
             gr.Markdown("""
-            **免責聲明**：本系統應用ChatGPT進行智慧照顧產品推薦，提供之產品資訊僅供參考，
-            使用者應自行前往各產品的官方網頁確認詳細資訊及最新規格。
+            **免責聲明**：本系統應用ChatGPT進行智慧照顧產品推薦，
+            提供之產品資訊僅供參考，使用者應自行前往各產品的官方網頁確認詳細資訊及最新規格。
             """)
     
     state = gr.State({"step": 0, "dialog_history": []})
 
     with gr.Row():
-        with gr.Column(scale=12):
-            chatbot = gr.Chatbot(height=400)
-        with gr.Column(scale=4):
+        with gr.Column(scale=12, elem_classes="chat-container"):
+            chatbot = gr.Chatbot(height=450, elem_classes="chatbot")
+        with gr.Column(scale=4, elem_classes="input-container"):
             user_input = gr.Textbox(
                 label="您的訊息",
-                placeholder="在此輸入...",
-                lines=1,
+                placeholder="請輸入您的需求...",
+                lines=2,
                 show_label=False
             )
             email = gr.Textbox(
                 label="電子郵件",
-                placeholder="請在此輸入您的電子郵件信箱"
+                placeholder="請輸入您的電子郵件信箱",
+                elem_classes="email-input"
             )
-            with gr.Row():
-                send_email_btn = gr.Button("寄送郵件", variant="primary")
-                clear_chat_btn = gr.Button("清除聊天", variant="secondary")
+            with gr.Row(elem_classes="button-container"):
+                send_email_btn = gr.Button("寄送郵件", variant="primary", elem_classes="button-primary")
+                clear_chat_btn = gr.Button("清除聊天", variant="secondary", elem_classes="button-secondary")
             qr_code = gr.Image(
                 "QRCode.png",
                 label="掃描此QR Code填寫回饋表單",
-                elem_id="qr_code"
+                elem_id="qr_code",
+                width=200
             )
     
     def interact(user_input, state, email):
