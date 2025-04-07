@@ -1,0 +1,5 @@
+2025-04-07 13:24:58,609 - INFO - 成功載入Excel數據
+2025-04-07 13:24:59,939 - INFO - HTTP Request: GET https://api.gradio.app/pkg-version "HTTP/1.1 200 OK"
+2025-04-07 13:25:01,125 - INFO - HTTP Request: GET http://localhost:7860/gradio_api/startup-events "HTTP/1.1 200 OK"
+2025-04-07 13:25:03,274 - INFO - HTTP Request: HEAD http://localhost:7860/ "HTTP/1.1 200 OK"
+2025-04-07 13:25:04,650 - INFO - HTTP Request: GET https://api.gradio.app/v3/tunnel-request "HTTP/1.1 200 OK"
