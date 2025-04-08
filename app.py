@@ -55,21 +55,38 @@ def load_excel_data():
 # 載入產品數據
 try:
     df = load_excel_data()
+    # 建立產品分類緩存
+    product_categories = {}
+    for _, row in df.iterrows():
+        category = row['產品第一層分類']
+        if category not in product_categories:
+            product_categories[category] = []
+        product_categories[category].append(row.to_dict())
 except Exception as e:
     logging.error(f"初始化數據時發生錯誤: {str(e)}")
     raise
 
+def get_category_products(category):
+    """獲取特定分類的產品數據"""
+    if category in product_categories:
+        return product_categories[category]
+    return []
+
 def query_chatgpt(user_input, state, email):
-    global conversation, df, current_step
+    global conversation, current_step
     
     try:
-        system_prompt = f"""
+        # 基礎系統提示，不包含產品數據
+        base_system_prompt = """
         # 角色與目標
-你是智慧照顧產品推薦專家。你的任務是根據客戶的需求，從一份包含詳細產品資訊的資料來源中，為客戶推薦合適的智慧照顧產品。這份資料包含每一項產品的「產品名稱」、「公司名稱」、「公司地址」、「連絡電話」、「產品網址」、「主要功能」、「使用方式」、「產品第一層分類」和「產品第二層分類」。
+你是智慧照顧產品推薦專家。你的任務是根據客戶的需求，從一份包含詳細產品資訊的資料來源中，為客戶推薦合適的智慧照顧產品。
 
 # 重要限制
 *   **絕對禁止** 在與客戶的任何互動中提及或暗示你參考的具體資料來源（例如，檔案名稱、資料庫名稱等）。所有推薦應自然呈現，如同基於你的專業知識。
 *   嚴格按照以下步驟進行推薦流程。
+
+# 可用的產品分類
+{categories}
 
 # 推薦流程步驟
 
@@ -108,8 +125,21 @@ def query_chatgpt(user_input, state, email):
 *   提供推薦後，詢問客戶：「請問以上推薦的產品是否符合您的期待？」
 *   **如果客戶表示滿意**：請接著說：「如果您對這次的推薦感到滿意，請在下方提供您的電子郵件地址，我會將推薦結果整理後寄送給您。」
 *   **如果客戶表示不滿意或需要調整**：請回到**步驟二**，重新仔細詢問客戶不滿意的原因或新的需求細節，並根據新的資訊繼續推進後續步驟（可能需要重新確認第二層分類，甚至回到步驟一重新確認第一層分類）。
-        {df.to_string(index=False)}
         """
+
+        # 根據對話階段動態添加產品數據
+        if "current_category" in state and state["current_category"]:
+            category_products = get_category_products(state["current_category"])
+            products_data = "\n相關產品資訊：\n" + "\n".join([
+                f"產品：{p['產品名稱']}\n公司：{p['公司名稱']}\n功能：{p['主要功能']}\n"
+                for p in category_products
+            ])
+        else:
+            products_data = ""
+
+        # 填充分類資訊
+        categories_list = "\n".join([f"- {cat}" for cat in product_categories.keys()])
+        system_prompt = base_system_prompt.format(categories=categories_list) + products_data
 
         conversation.append({"role": "user", "content": user_input})
 
@@ -124,6 +154,12 @@ def query_chatgpt(user_input, state, email):
 
         reply = response['choices'][0]['message']['content']
         conversation.append({"role": "assistant", "content": reply})
+
+        # 更新當前分類（如果在回覆中提到）
+        for category in product_categories.keys():
+            if category in reply:
+                state["current_category"] = category
+                break
 
         state["recommendations"] = reply
         state["email_content"] = reply
@@ -181,7 +217,8 @@ def gradio_interface(user_input, email, state):
             "products_info": None,
             "recommendations": "",
             "email_content": "",
-            "chat_history": []
+            "chat_history": [],
+            "current_category": None
         }
     return query_chatgpt(user_input, state, email)
 
@@ -352,7 +389,7 @@ with gr.Blocks(
     def clear_chat(state):
         global conversation
         conversation = []
-        state = {"step": 0, "dialog_history": []}
+        state = {"step": 0, "dialog_history": [], "current_category": None}
         return "", state
 
     user_input.submit(
