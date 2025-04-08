@@ -264,9 +264,10 @@ with gr.Blocks(
         }
         
         .disclaimer {
-            background-color: rgba(60, 60, 60, 0.9);
-            color: #e0e0e0 !important;
-            border: 1px solid #4d4d4d;
+            background-color: rgba(60, 60, 60, 0.9) !important;
+            color: #ffd700 !important;  /* 使用金黃色以增加可讀性 */
+            border: 1px solid #ffd700 !important;  /* 添加金黃色邊框 */
+            text-shadow: 1px 1px 1px rgba(0,0,0,0.5);  /* 添加文字陰影 */
         }
         
         .chatbot {
@@ -346,6 +347,28 @@ with gr.Blocks(
         border-left: 4px solid #ffc107;
         border-radius: 4px;
     }
+
+    /* QR Code 容器樣式 */
+    .qr-code-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        margin-top: 20px;
+    }
+
+    .qr-code-image {
+        width: 200px;
+        height: 200px;
+        object-fit: contain;
+    }
+
+    .qr-code-label {
+        text-align: center;
+        font-size: 0.9em;
+        color: #666;
+        margin-top: 5px;
+    }
     """
 ) as demo:
     with gr.Row(elem_classes="header"):
@@ -381,9 +404,14 @@ with gr.Blocks(
                 clear_chat_btn = gr.Button("清除聊天", variant="secondary", elem_classes="button-secondary")
             qr_code = gr.Image(
                 "QRCode.png",
-                label="掃描此QR Code填寫回饋表單",
+                show_label=False,  # 移除原本的標籤
                 elem_id="qr_code",
+                elem_classes="qr-code-image",
                 width=200
+            )
+            gr.Markdown(
+                "**掃描此QR Code填寫回饋表單**",
+                elem_classes="qr-code-label"
             )
     
     def interact(user_input, state, email):
