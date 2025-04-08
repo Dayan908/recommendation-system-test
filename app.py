@@ -180,10 +180,16 @@ def send_email(to_email, subject, body):
         sender_email = os.getenv("EMAIL_SENDER")
         sender_password = os.getenv("EMAIL_PASSWORD")
         
-        if not sender_email or not sender_password:
-            logging.error("郵件設定未配置")
-            return "郵件設定未配置，請聯繫管理員"
-
+        # 添加環境變數檢查
+        if not sender_email:
+            logging.error("EMAIL_SENDER 環境變數未設置")
+            return "郵件設定錯誤：寄件者郵箱未設置"
+        if not sender_password:
+            logging.error("EMAIL_PASSWORD 環境變數未設置")
+            return "郵件設定錯誤：寄件者密碼未設置"
+            
+        logging.info(f"嘗試使用郵箱帳號: {sender_email}")
+        
         smtp_server = "smtp.gmail.com"
         smtp_port = 587
 
@@ -197,14 +203,23 @@ def send_email(to_email, subject, body):
         body_with_disclaimer = body + disclaimer
         msg.attach(MIMEText(body_with_disclaimer, "plain"))
 
-        server = smtplib.SMTP(smtp_server, smtp_port)
-        server.starttls()
-        server.login(sender_email, sender_password)
-        server.sendmail(sender_email, to_email, msg.as_string())
-        server.quit()
-
-        logging.info(f"成功發送郵件至 {to_email}")
-        return "郵件已成功發送"
+        try:
+            server = smtplib.SMTP(smtp_server, smtp_port)
+            server.starttls()
+            logging.info("正在嘗試登入 SMTP 伺服器...")
+            server.login(sender_email, sender_password)
+            logging.info("SMTP 伺服器登入成功")
+            server.sendmail(sender_email, to_email, msg.as_string())
+            server.quit()
+            logging.info(f"成功發送郵件至 {to_email}")
+            return "郵件已成功發送"
+        except smtplib.SMTPAuthenticationError as e:
+            logging.error(f"SMTP 認證錯誤: {str(e)}")
+            return f"郵件發送失敗: SMTP 認證錯誤，請檢查郵箱設定"
+        except Exception as e:
+            logging.error(f"SMTP 錯誤: {str(e)}")
+            return f"郵件發送失敗: {str(e)}"
+            
     except Exception as e:
         logging.error(f"發送郵件時發生錯誤: {str(e)}")
         return f"郵件發送失敗: {str(e)}"
