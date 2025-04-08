@@ -450,9 +450,9 @@ with gr.Blocks(
                 elem_classes="qr-code-label"
             )
     
-    async def interact(user_input, state, email):
+    async def process_input(user_input, state, email):
         loading_indicator.visible = True
-        chat_history, state = await interact(user_input, state, email)
+        chat_history, state = query_chatgpt(user_input, state, email)
         loading_indicator.visible = False
         return chat_history, state, ""
 
@@ -474,7 +474,7 @@ with gr.Blocks(
         return "", state
 
     user_input.submit(
-        interact,
+        process_input,
         inputs=[user_input, state, email],
         outputs=[chatbot, state, user_input]
     )
