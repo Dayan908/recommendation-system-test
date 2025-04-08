@@ -79,80 +79,57 @@ def query_chatgpt(user_input, state, email):
         # 基礎系統提示
         base_system_prompt = """
         # 角色與目標
-你是智慧照顧產品推薦專家。你的任務是根據客戶的需求，從一份包含詳細產品資訊的資料來源中，為客戶推薦合適的智慧照顧產品。
+你是智慧照顧產品推薦專家。你的任務是根據客戶的需求推薦合適的智慧照顧產品。
 
 # 重要限制
-*   **絕對禁止** 在與客戶的任何互動中提及或暗示你參考的具體資料來源（例如，檔案名稱、資料庫名稱等）。所有推薦應自然呈現，如同基於你的專業知識。
-*   嚴格按照以下步驟進行推薦流程。
-
-# 可用的產品分類
-{categories}
-
-# 所有產品資訊
-{all_products}
+- 嚴格按照推薦流程步驟進行
+- 確保推薦的產品符合客戶需求
 
 # 推薦流程步驟
-
-**步驟零：啟動與重置**
-*   當客戶表達**開始新諮詢的意圖**時（例如，透過說「你好」、「我想找產品」、「請推薦」、「重新開始」等類似語句），即視為啟動一個**全新的推薦流程**。
-*   在此階段，請準備好從資料來源讀取信息，並等待客戶提出初步需求。請用友善的招呼語開始，例如：「您好！我是智慧照顧產品推薦專家，請問您在尋找哪方面的協助或產品呢？」
-
-**步驟一：確認第一層分類**
-*   客戶提出簡短需求後，根據其描述，初步判斷需求產品最可能屬於資料來源中的哪一個「產品第一層分類」。
-*   向客戶提出你判斷的分類，並**簡短解釋**該分類大致包含哪些類型的產品或解決方案，詢問客戶**這個方向是否符合他們的需求**。
-*   **必須**先完成此分類的確認，請勿直接跳到詢問第二層分類。
-
-**步驟二：探索第二層分類需求**
-*   在客戶**確認第一層分類正確**後，仔細閱讀該分類下所有產品的「主要功能」和「使用方式」描述。
-*   基於這些產品的細節差異，**提出具體的問題**來引導客戶，釐清他們更細緻的需求。
-
-**步驟三：統整與確認需求**
-*   根據客戶在步驟二的回覆，**統整**目前了解到的所有需求資訊。
-*   明確指出這些需求對應到資料來源中的哪一個或哪些「產品第二層分類」。
-*   再次向客戶**清晰地複述**你所理解的完整需求。
-
-**步驟四：提供產品推薦**
-*   在客戶**確認步驟三的資訊無誤**後，從資料來源中篩選出最符合其需求的產品。
-*   **至少推薦三項**產品。
-*   對於每項推薦的產品，請提供完整資訊。
-
-**步驟五：滿意度詢問與後續**
-*   提供推薦後，詢問客戶是否滿意。
-*   如果滿意，請客戶提供電子郵件地址。
-*   如果不滿意，重新從資料來源中篩選並推薦。
+1. 確認需求分類
+2. 探索具體需求
+3. 統整並確認
+4. 提供產品推薦
+5. 詢問滿意度
         """
 
-        # 獲取所有產品資訊
-        all_products_info = []
-        for category, products in product_categories.items():
-            for product in products:
-                product_info = (
-                    f"\n產品名稱：{product['產品名稱']}\n"
-                    f"公司名稱：{product['公司名稱']}\n"
-                    f"公司地址：{product['公司地址']}\n"
-                    f"連絡電話：{product['連絡電話']}\n"
-                    f"產品網址：{product['產品網址']}\n"
-                    f"主要功能：{product['主要功能']}\n"
-                    f"使用方式：{product['使用方式']}\n"
-                    f"產品第一層分類：{product['產品第一層分類']}\n"
-                    f"產品第二層分類：{product['產品第二層分類']}\n"
-                    f"---"
-                )
-                all_products_info.append(product_info)
+        # 獲取相關產品資訊
+        relevant_products = []
+        if "current_category" in state and state["current_category"]:
+            # 如果已經確定了分類，只獲取該分類的產品
+            products = product_categories.get(state["current_category"], [])
+            relevant_products.extend(products)
+        else:
+            # 如果還沒有確定分類，獲取所有分類的前3個產品作為參考
+            for category, products in product_categories.items():
+                relevant_products.extend(products[:3])
 
-        # 填充分類資訊和所有產品資訊
-        categories_list = "\n".join([f"- {cat}" for cat in product_categories.keys()])
-        all_products_text = "\n".join(all_products_info)
+        # 將產品資訊轉換為更簡潔的格式
+        products_info = []
+        for product in relevant_products:
+            product_info = (
+                f"產品：{product['產品名稱']}\n"
+                f"分類：{product['產品第一層分類']}-{product['產品第二層分類']}\n"
+                f"功能：{product['主要功能']}\n"
+                f"使用方式：{product['使用方式']}\n"
+                f"---"
+            )
+            products_info.append(product_info)
+
+        # 添加分類資訊
+        categories_info = "可用分類：\n" + "\n".join([f"- {cat}" for cat in product_categories.keys()])
         
-        system_prompt = base_system_prompt.format(
-            categories=categories_list,
-            all_products=all_products_text
+        # 組合完整的system prompt
+        system_prompt = (
+            base_system_prompt + "\n\n" +
+            categories_info + "\n\n" +
+            "產品資訊：\n" + "\n".join(products_info)
         )
 
         conversation.append({"role": "user", "content": user_input})
 
         response = openai.ChatCompletion.create(
-            model="gpt-4",
+            model="gpt-4o-mini-2024-07-18",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "system", "content": f"目前進行：{current_step}"},
@@ -232,6 +209,10 @@ def send_email(to_email, subject, body):
         logging.error(f"發送郵件時發生錯誤: {str(e)}")
         return f"郵件發送失敗: {str(e)}"
 
+def interact(user_input, state, email):
+    chat_history, state = query_chatgpt(user_input, state, email)
+    return chat_history, state, ""
+
 def gradio_interface(user_input, email, state):
     if state is None:
         state = {
@@ -243,7 +224,7 @@ def gradio_interface(user_input, email, state):
             "chat_history": [],
             "current_category": None
         }
-    return query_chatgpt(user_input, state, email)
+    return interact(user_input, state, email)
 
 # Gradio Blocks UI
 with gr.Blocks(
@@ -471,7 +452,7 @@ with gr.Blocks(
     
     async def interact(user_input, state, email):
         loading_indicator.visible = True
-        chat_history, state = await query_chatgpt(user_input, state, email)
+        chat_history, state = await interact(user_input, state, email)
         loading_indicator.visible = False
         return chat_history, state, ""
 
