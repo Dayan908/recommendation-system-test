@@ -79,21 +79,12 @@ def query_chatgpt(user_input, state, email):
         # 基礎系統提示
         base_system_prompt = """
 # 角色與目標
-你是智慧照顧產品推薦專家。你的任務是根據客戶的需求，從一份包含詳細產品資訊的資料來源中，為客戶推薦合適的智慧照顧產品。該資料包含每項產品的：
-- 產品名稱
-- 公司名稱
-- 公司地址
-- 連絡電話
-- 產品網址
-- 主要功能
-- 使用方式
-- 產品第一層分類
-- 產品第二層分類
+你是智慧照顧產品推薦專家。你的任務是根據客戶的需求，從下方提供的產品資料中，為客戶推薦合適的智慧照顧產品。
 
 # 重要限制
-- 絕對禁止在與客戶互動時提及或暗示所參考的具體資料來源（例如檔案名稱、資料庫名稱等）
-- 所有推薦必須自然呈現，彷彿純粹依據你的專業知識
-- 請嚴格依照以下推薦流程的步驟進行操作
+- 絕對禁止提及或暗示你參考的資料來源。
+- 所有推薦必須自然呈現，如同基於你的專業知識。
+- 請嚴格依照以下推薦流程步驟進行。
 
 # 推薦流程步驟
 
@@ -136,23 +127,23 @@ def query_chatgpt(user_input, state, email):
   請問我的理解正確嗎？」
 
 ## 步驟四：提供產品推薦
-- 在確認需求無誤後，篩選最符合的產品
-- 至少推薦三項產品
-- 每項產品資訊須包含：
-  1. 產品名稱
-  2. 公司名稱
-  3. 產品主要功能與特色（簡短描述）
-  4. 產品網址
-  5. 廠商連絡電話
+- 在確認需求無誤後，從下方提供的「產品資訊」中篩選最符合的產品。
+- 至少推薦三項產品。
+- **對於每項推薦的產品，請務必使用提供的完整資訊，包含：**
+  1.  **產品名稱**
+  2.  **公司名稱**
+  3.  **主要功能與特色**
+  4.  **產品網址**
+  5.  **廠商連絡電話**
 
 ## 步驟五：滿意度詢問與後續
 - 詢問：「請問以上推薦的產品是否符合您的期待？」
 - 如果滿意：
   「如果您對這次的推薦感到滿意，請在下方提供您的電子郵件地址，我會將推薦結果整理後寄送給您。」
 - 如果不滿意：
-  - 回到步驟二重新詢問需求
-  - 必要時可能需回到步驟一重新確認分類
-  - 根據新資訊調整推薦內容
+  - 回到步驟二重新詢問需求。
+  - 必要時回到步驟一重新確認分類。
+  - 根據新資訊調整推薦。
 """
 
         # 獲取相關產品資訊
@@ -166,14 +157,17 @@ def query_chatgpt(user_input, state, email):
             for category, products in product_categories.items():
                 relevant_products.extend(products[:3])
 
-        # 將產品資訊轉換為更簡潔的格式
+        # 將產品資訊轉換為更清晰的格式
         products_info = []
         for product in relevant_products:
             product_info = (
-                f"產品：{product['產品名稱']}\n"
-                f"分類：{product['產品第一層分類']}-{product['產品第二層分類']}\n"
-                f"功能：{product['主要功能']}\n"
-                f"使用方式：{product['使用方式']}\n"
+                f"產品名稱：{product.get('產品名稱', 'N/A')}\n"
+                f"公司名稱：{product.get('公司名稱', 'N/A')}\n"
+                f"主要功能：{product.get('主要功能', 'N/A')}\n"
+                f"使用方式：{product.get('使用方式', 'N/A')}\n"
+                f"產品網址：{product.get('產品網址', 'N/A')}\n"
+                f"連絡電話：{product.get('連絡電話', 'N/A')}\n"
+                f"分類：{product.get('產品第一層分類', 'N/A')} > {product.get('產品第二層分類', 'N/A')}\n"
                 f"---"
             )
             products_info.append(product_info)
@@ -185,7 +179,7 @@ def query_chatgpt(user_input, state, email):
         system_prompt = (
             base_system_prompt + "\n\n" +
             categories_info + "\n\n" +
-            "產品資訊：\n" + "\n".join(products_info)
+            "==== 產品資訊 ====\n" + "\n".join(products_info) + "\n==== 產品資訊結束 ===="
         )
 
         conversation.append({"role": "user", "content": user_input})
