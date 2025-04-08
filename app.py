@@ -187,8 +187,8 @@ def query_chatgpt(user_input, state, email):
         response = openai.ChatCompletion.create(
             model="o1-mini-2024-09-12",
             messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "system", "content": f"目前進行：{current_step}"},
+                {"role": "user", "content": system_prompt},
+                {"role": "user", "content": f"目前進行：{current_step}"},
                 *conversation
             ]
         )
