@@ -149,13 +149,13 @@ def query_chatgpt(user_input, state, email):
         # 獲取相關產品資訊
         relevant_products = []
         if "current_category" in state and state["current_category"]:
-            # 如果已經確定了分類，只獲取該分類的產品
+            # 如果已經確定了分類，獲取該分類的所有產品
             products = product_categories.get(state["current_category"], [])
             relevant_products.extend(products)
         else:
-            # 如果還沒有確定分類，獲取所有分類的前3個產品作為參考
+            # 如果還沒有確定分類，獲取所有產品
             for category, products in product_categories.items():
-                relevant_products.extend(products[:3])
+                relevant_products.extend(products)  # 獲取所有產品，不限制數量
 
         # 將產品資訊轉換為更清晰的格式
         products_info = []
