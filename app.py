@@ -76,7 +76,7 @@ def query_chatgpt(user_input, state, email):
     global conversation, current_step
     
     try:
-        # 基礎系統提示，不包含產品數據
+        # 基礎系統提示
         base_system_prompt = """
         # 角色與目標
 你是智慧照顧產品推薦專家。你的任務是根據客戶的需求，從一份包含詳細產品資訊的資料來源中，為客戶推薦合適的智慧照顧產品。
@@ -88,6 +88,9 @@ def query_chatgpt(user_input, state, email):
 # 可用的產品分類
 {categories}
 
+# 所有產品資訊
+{all_products}
+
 # 推薦流程步驟
 
 **步驟零：啟動與重置**
@@ -98,53 +101,58 @@ def query_chatgpt(user_input, state, email):
 *   客戶提出簡短需求後，根據其描述，初步判斷需求產品最可能屬於資料來源中的哪一個「產品第一層分類」。
 *   向客戶提出你判斷的分類，並**簡短解釋**該分類大致包含哪些類型的產品或解決方案，詢問客戶**這個方向是否符合他們的需求**。
 *   **必須**先完成此分類的確認，請勿直接跳到詢問第二層分類。
-    *   範例對話：「聽起來您可能在尋找與『居家安全監控』相關的產品，這類產品通常用於偵測跌倒、異常離床或提供緊急呼叫功能。請問這個方向是您想要的嗎？」
 
 **步驟二：探索第二層分類需求**
 *   在客戶**確認第一層分類正確**後，仔細閱讀該分類下所有產品的「主要功能」和「使用方式」描述。
-*   基於這些產品的細節差異，**提出具體的問題**來引導客戶，釐清他們更細緻的需求，以幫助判斷最適合的「產品第二層分類」。問題應圍繞功能、使用場景、操作偏好等。
-    *   範例提問（假設第一層是居家安全監控）：「為了更精確地推薦，想請問您比較重視的是『自動偵測並發出警報』（例如跌倒偵測），還是需要讓使用者能『主動求助』（例如緊急按鈕）的功能呢？或者，您對於安裝方式（例如固定式、穿戴式）有特別的偏好嗎？」
+*   基於這些產品的細節差異，**提出具體的問題**來引導客戶，釐清他們更細緻的需求。
 
 **步驟三：統整與確認需求**
 *   根據客戶在步驟二的回覆，**統整**目前了解到的所有需求資訊。
 *   明確指出這些需求對應到資料來源中的哪一個或哪些「產品第二層分類」。
-*   再次向客戶**清晰地複述**你所理解的完整需求（包含第一層與可能的第二層分類指向），並**請求客戶確認**這些資訊是否完全正確，或者是否有需要補充或修改的地方。
-    *   範例確認：「好的，根據我們剛才的討論，我整理一下您的需求：您主要需要『居家安全監控』類的產品（第一層分類），並且特別希望是能夠『自動偵測異常狀態，如跌倒』的功能（對應到可能的第二層分類），而且偏好『非穿戴式』的設備。請問我這樣理解正確嗎？」
+*   再次向客戶**清晰地複述**你所理解的完整需求。
 
 **步驟四：提供產品推薦**
 *   在客戶**確認步驟三的資訊無誤**後，從資料來源中篩選出最符合其需求的產品。
 *   **至少推薦三項**產品。
-*   對於每項推薦的產品，請提供以下資訊：
-    *   **產品名稱**
-    *   **公司名稱**
-    *   **產品主要功能與特色（簡短描述）**
-    *   **產品網址**
-    *   **廠商連絡電話**
+*   對於每項推薦的產品，請提供完整資訊。
 
 **步驟五：滿意度詢問與後續**
-*   提供推薦後，詢問客戶：「請問以上推薦的產品是否符合您的期待？」
-*   **如果客戶表示滿意**：請接著說：「如果您對這次的推薦感到滿意，請在下方提供您的電子郵件地址，我會將推薦結果整理後寄送給您。」
-*   **如果客戶表示不滿意或需要調整**：請仔細理解客戶的新需求或不滿意的原因，**然後根據最新的理解，重新從資料來源中篩選並推薦合適的產品**（回到步驟四）。
+*   提供推薦後，詢問客戶是否滿意。
+*   如果滿意，請客戶提供電子郵件地址。
+*   如果不滿意，重新從資料來源中篩選並推薦。
         """
 
-        # 根據對話階段動態添加產品數據
-        if "current_category" in state and state["current_category"]:
-            category_products = get_category_products(state["current_category"])
-            products_data = "\n相關產品資訊：\n" + "\n".join([
-                f"產品：{p['產品名稱']}\n公司：{p['公司名稱']}\n功能：{p['主要功能']}\n"
-                for p in category_products
-            ])
-        else:
-            products_data = ""
+        # 獲取所有產品資訊
+        all_products_info = []
+        for category, products in product_categories.items():
+            for product in products:
+                product_info = (
+                    f"\n產品名稱：{product['產品名稱']}\n"
+                    f"公司名稱：{product['公司名稱']}\n"
+                    f"公司地址：{product['公司地址']}\n"
+                    f"連絡電話：{product['連絡電話']}\n"
+                    f"產品網址：{product['產品網址']}\n"
+                    f"主要功能：{product['主要功能']}\n"
+                    f"使用方式：{product['使用方式']}\n"
+                    f"產品第一層分類：{product['產品第一層分類']}\n"
+                    f"產品第二層分類：{product['產品第二層分類']}\n"
+                    f"---"
+                )
+                all_products_info.append(product_info)
 
-        # 填充分類資訊
+        # 填充分類資訊和所有產品資訊
         categories_list = "\n".join([f"- {cat}" for cat in product_categories.keys()])
-        system_prompt = base_system_prompt.format(categories=categories_list) + products_data
+        all_products_text = "\n".join(all_products_info)
+        
+        system_prompt = base_system_prompt.format(
+            categories=categories_list,
+            all_products=all_products_text
+        )
 
         conversation.append({"role": "user", "content": user_input})
 
         response = openai.ChatCompletion.create(
-            model="gpt-4o-mini-2024-07-18",
+            model="gpt-4",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "system", "content": f"目前進行：{current_step}"},
@@ -369,6 +377,49 @@ with gr.Blocks(
         color: #666;
         margin-top: 5px;
     }
+
+    /* 載入狀態指示器 */
+    .loading-spinner {
+        display: none;
+        margin: 10px auto;
+        text-align: center;
+    }
+    
+    .loading-spinner.active {
+        display: block;
+    }
+    
+    /* 移動端優化 */
+    @media (max-width: 768px) {
+        .chat-container {
+            height: 60vh !important;
+        }
+        
+        .input-container {
+            margin-top: 10px;
+            padding: 10px;
+        }
+        
+        .button-container {
+            flex-direction: column;
+        }
+        
+        .qr-code-image {
+            width: 150px;
+            height: 150px;
+        }
+    }
+    
+    /* 錯誤提示動畫 */
+    @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-5px); }
+        75% { transform: translateX(5px); }
+    }
+    
+    .error-shake {
+        animation: shake 0.5s ease-in-out;
+    }
     """
 ) as demo:
     with gr.Row(elem_classes="header"):
@@ -386,6 +437,10 @@ with gr.Blocks(
 
     with gr.Row():
         with gr.Column(scale=12, elem_classes="chat-container"):
+            loading_indicator = gr.HTML(
+                '<div class="loading-spinner">處理中...</div>',
+                visible=False
+            )
             chatbot = gr.Chatbot(height=450, elem_classes="chatbot", show_label=False)
         with gr.Column(scale=4, elem_classes="input-container"):
             user_input = gr.Textbox(
@@ -414,8 +469,10 @@ with gr.Blocks(
                 elem_classes="qr-code-label"
             )
     
-    def interact(user_input, state, email):
-        chat_history, state = query_chatgpt(user_input, state, email)
+    async def interact(user_input, state, email):
+        loading_indicator.visible = True
+        chat_history, state = await query_chatgpt(user_input, state, email)
+        loading_indicator.visible = False
         return chat_history, state, ""
 
     def handle_send_email(email, state):
