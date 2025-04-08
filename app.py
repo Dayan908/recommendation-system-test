@@ -198,6 +198,35 @@ with gr.Blocks(
         border-radius: 15px;
         box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     }
+
+    /* 深色模式適配 */
+    @media (prefers-color-scheme: dark) {
+        .container {
+            background-color: #2d2d2d;
+            color: #e0e0e0;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #3d3d3d 0%, #2d2d2d 100%);
+            color: #e0e0e0;
+        }
+        
+        .disclaimer {
+            background-color: rgba(60, 60, 60, 0.9);
+            color: #e0e0e0 !important;
+            border: 1px solid #4d4d4d;
+        }
+        
+        .chatbot {
+            background-color: #2d2d2d;
+            border-color: #4d4d4d;
+        }
+        
+        .input-container {
+            background-color: #2d2d2d;
+            border-color: #4d4d4d;
+        }
+    }
     
     /* 標題樣式 */
     .header { 
