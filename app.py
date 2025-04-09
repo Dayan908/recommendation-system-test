@@ -85,6 +85,7 @@ def query_chatgpt(user_input, state, email):
 - 絕對禁止提及或暗示你參考的資料來源。
 - 所有推薦必須自然呈現，如同基於你的專業知識。
 - 請嚴格依照以下推薦流程步驟進行。
+- 任何對話都必須使用繁體中文亦或是使用者使用的語言。
 
 # 推薦流程步驟
 
@@ -185,7 +186,7 @@ def query_chatgpt(user_input, state, email):
         conversation.append({"role": "user", "content": user_input})
 
         response = openai.ChatCompletion.create(
-            model="o1-mini-2024-09-12",
+            model="gpt-4o-2024-08-06",
             messages=[
                 {"role": "user", "content": system_prompt},
                 {"role": "user", "content": f"目前進行：{current_step}"},
