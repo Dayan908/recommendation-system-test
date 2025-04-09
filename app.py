@@ -197,6 +197,19 @@ def query_chatgpt(user_input, state, email):
         reply = response['choices'][0]['message']['content']
         conversation.append({"role": "assistant", "content": reply})
 
+        # --- 新增：保存對話紀錄 ---
+        try:
+            log_file = "conversation_log.txt"
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            with open(log_file, 'a', encoding='utf-8') as f:
+                f.write(f"[{timestamp}] User: {user_input}\\n")
+                f.write(f"[{timestamp}] ChatGPT: {reply}\\n")
+                f.write("---\\n")  # 添加分隔符
+            logging.info(f"成功將對話紀錄寫入 {log_file}")
+        except Exception as log_e:
+            logging.error(f"寫入對話紀錄時發生錯誤: {str(log_e)}")
+        # --- 新增結束 ---
+
         # 更新當前分類（如果在回覆中提到）
         for category in product_categories.keys():
             if category in reply:
