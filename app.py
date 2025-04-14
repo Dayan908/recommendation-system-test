@@ -653,49 +653,56 @@ with gr.Blocks(
     # 修改處理輸入的函數，使用戶訊息立即顯示
     def process_input(user_input, chatbot, state, email):
         if not user_input.strip():
-            return chatbot, state, ""
+            return chatbot, state, "", True  # 保持輸入欄啟用
         
         # 先將用戶訊息添加到聊天視窗
         chatbot = chatbot + [(user_input, None)]
         
-        # 返回更新後的界面，使用戶訊息立即顯示
-        return chatbot, state, ""
+        # 返回更新後的界面，使用戶訊息立即顯示，並禁用輸入欄
+        return chatbot, state, "", False  # 禁用輸入欄
         
     # 添加一個新函數來處理 API 響應
     def process_response(chatbot, state, last_user_input, email):
         if not chatbot or not last_user_input:
-            return chatbot, state
+            return chatbot, state, True  # 重新啟用輸入欄
             
         loading_indicator.visible = True
         
-        # 呼叫原有的 query_chatgpt 函數處理對話
-        chat_history, updated_state = query_chatgpt(last_user_input, state, email)
-        
-        # 從 chat_history 中獲取 AI 回應
-        ai_response = "無法獲取回應"
-        if isinstance(chat_history, list) and len(chat_history) > 0:
-            latest_response = chat_history[-1]
-            if isinstance(latest_response, tuple) and len(latest_response) > 1:
-                ai_response = latest_response[1]
-        
-        # 更新聊天窗口中最後一條消息的回應部分
-        if len(chatbot) > 0:
-            chatbot[-1] = (chatbot[-1][0], ai_response)
+        try:
+            # 呼叫原有的 query_chatgpt 函數處理對話
+            chat_history, updated_state = query_chatgpt(last_user_input, state, email)
+            
+            # 從 chat_history 中獲取 AI 回應
+            ai_response = "無法獲取回應"
+            if isinstance(chat_history, list) and len(chat_history) > 0:
+                latest_response = chat_history[-1]
+                if isinstance(latest_response, tuple) and len(latest_response) > 1:
+                    ai_response = latest_response[1]
+            
+            # 更新聊天窗口中最後一條消息的回應部分
+            if len(chatbot) > 0:
+                chatbot[-1] = (chatbot[-1][0], ai_response)
+            
+        except Exception as e:
+            # 處理可能的錯誤
+            logging.error(f"處理回應時發生錯誤: {str(e)}")
+            if len(chatbot) > 0:
+                chatbot[-1] = (chatbot[-1][0], "抱歉，處理您的請求時發生錯誤，請重試。")
         
         loading_indicator.visible = False
         
-        # 返回更新後的界面
-        return chatbot, updated_state
+        # 返回更新後的界面並重新啟用輸入欄
+        return chatbot, updated_state, True
     
     # 修改事件處理，分成兩個步驟：先顯示用戶訊息，然後處理響應
     user_input.submit(
         fn=process_input,  # 第一步：顯示用戶訊息
         inputs=[user_input, chatbot, state, email],
-        outputs=[chatbot, state, user_input]
+        outputs=[chatbot, state, user_input, user_input.interactive]
     ).then(
         fn=process_response,  # 第二步：獲取並顯示 AI 響應
         inputs=[chatbot, state, user_input, email],
-        outputs=[chatbot, state]
+        outputs=[chatbot, state, user_input.interactive]
     )
 
     def handle_send_email(email, state):
@@ -713,8 +720,8 @@ with gr.Blocks(
         global conversation
         conversation = []
         state = {"step": 0, "dialog_history": [], "current_category": None}
-        return "", state
-
+        return "", state, True  # 確保清除聊天後輸入欄啟用
+    
     send_email_btn.click(
         fn=handle_send_email,
         inputs=[email, state],
@@ -724,7 +731,7 @@ with gr.Blocks(
     clear_chat_btn.click(
         fn=clear_chat,
         inputs=[state],
-        outputs=[chatbot, state]
+        outputs=[chatbot, state, user_input.interactive]
     )
 
 if __name__ == "__main__":
