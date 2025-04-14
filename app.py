@@ -624,7 +624,6 @@ with gr.Blocks(
                         interactive=True,
                         lines=1,  # 單行模式
                         elem_classes="main-input",
-                        submit_btn="發送",  # 保留發送按鈕
                         scale=1  # 使其佔據整行
                     )
         
@@ -653,18 +652,18 @@ with gr.Blocks(
     # 修改處理輸入的函數，使用戶訊息立即顯示
     def process_input(user_input, chatbot, state, email):
         if not user_input.strip():
-            return chatbot, state, "", True  # 保持輸入欄啟用
+            return chatbot, state, "", user_input  # 修改返回值
         
         # 先將用戶訊息添加到聊天視窗
         chatbot = chatbot + [(user_input, None)]
         
         # 返回更新後的界面，使用戶訊息立即顯示，並禁用輸入欄
-        return chatbot, state, "", False  # 禁用輸入欄
+        return chatbot, state, "", user_input  # 修改返回值
         
     # 添加一個新函數來處理 API 響應
     def process_response(chatbot, state, last_user_input, email):
         if not chatbot or not last_user_input:
-            return chatbot, state, True  # 重新啟用輸入欄
+            return chatbot, state, user_input  # 修改返回值
             
         loading_indicator.visible = True
         
@@ -692,17 +691,17 @@ with gr.Blocks(
         loading_indicator.visible = False
         
         # 返回更新後的界面並重新啟用輸入欄
-        return chatbot, updated_state, True
+        return chatbot, updated_state, user_input  # 修改返回值
     
     # 修改事件處理，分成兩個步驟：先顯示用戶訊息，然後處理響應
     user_input.submit(
         fn=process_input,  # 第一步：顯示用戶訊息
         inputs=[user_input, chatbot, state, email],
-        outputs=[chatbot, state, user_input, user_input.interactive]
+        outputs=[chatbot, state, user_input, user_input]  # 修改这里，使用组件而不是布尔值
     ).then(
         fn=process_response,  # 第二步：獲取並顯示 AI 響應
         inputs=[chatbot, state, user_input, email],
-        outputs=[chatbot, state, user_input.interactive]
+        outputs=[chatbot, state, user_input]  # 修改这里，使用组件而不是布尔值
     )
 
     def handle_send_email(email, state):
@@ -731,7 +730,7 @@ with gr.Blocks(
     clear_chat_btn.click(
         fn=clear_chat,
         inputs=[state],
-        outputs=[chatbot, state, user_input.interactive]
+        outputs=[chatbot, state, user_input]
     )
 
 if __name__ == "__main__":
