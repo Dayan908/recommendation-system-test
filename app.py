@@ -280,9 +280,10 @@ def send_email(to_email, subject, body):
         return f"郵件發送失敗: {str(e)}"
 
 def interact(user_input, state, email):
+    # 此函數不再需要修改，直接使用原有的 query_chatgpt
     chat_history, state = query_chatgpt(user_input, state, email)
     return chat_history, state, ""
-
+    
 def gradio_interface(user_input, email, state):
     if state is None:
         state = {
@@ -471,6 +472,35 @@ with gr.Blocks(
     .error-shake {
         animation: shake 0.5s ease-in-out;
     }
+
+    /* 主輸入欄樣式 */
+    .main-input {
+        margin-top: 15px !important;
+        margin-bottom: 15px !important;
+        border: 1px solid #ddd !important;
+        border-radius: 8px !important;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05) !important;
+        transition: border-color 0.3s, box-shadow 0.3s !important;
+    }
+    
+    .main-input:focus-within {
+        border-color: #667eea !important;
+        box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.25) !important;
+    }
+    
+    .main-input textarea {
+        padding: 12px 15px !important;
+        font-size: 1.05em !important;
+        min-height: 80px !important;
+    }
+    
+    /* 移動端適配 */
+    @media (max-width: 768px) {
+        .main-input textarea {
+            padding: 10px !important;
+            min-height: 60px !important;
+        }
+    }
     """
 ) as demo:
     with gr.Row(elem_classes="header"):
@@ -493,13 +523,18 @@ with gr.Blocks(
                 visible=False
             )
             chatbot = gr.Chatbot(height=450, elem_classes="chatbot", show_label=False)
-        with gr.Column(scale=4, elem_classes="input-container"):
+            
+            # 將輸入需求欄移到這裡，並放大
             user_input = gr.Textbox(
                 placeholder="請輸入您的需求...",
                 show_label=False,
                 interactive=True,
-                lines=1
+                lines=3,  # 增加行數
+                elem_classes="main-input"  # 添加自定義類以便於CSS樣式調整
             )
+            
+        with gr.Column(scale=4, elem_classes="input-container"):
+            # 移除舊的輸入欄，這裡只保留郵件輸入
             email = gr.Textbox(
                 label="電子郵件",
                 placeholder="請輸入您的電子郵件信箱",
@@ -520,11 +555,54 @@ with gr.Blocks(
                 elem_classes="qr-code-label"
             )
     
-    async def process_input(user_input, state, email):
+    # 修改處理輸入的函數，使用戶訊息立即顯示
+    def process_input(user_input, chatbot, state, email):
+        if not user_input.strip():
+            return chatbot, state, ""
+        
+        # 先將用戶訊息添加到聊天視窗
+        chatbot = chatbot + [(user_input, None)]
+        
+        # 返回更新後的界面
+        return chatbot, state, ""
+    
+    # 定義回調函數來處理API響應 
+    def process_response(chatbot, user_input, state, email):
+        if not user_input.strip():
+            return chatbot, state, ""
+        
         loading_indicator.visible = True
-        chat_history, state = query_chatgpt(user_input, state, email)
+        
+        # 呼叫原有的 query_chatgpt 函數處理對話
+        chat_history, updated_state = query_chatgpt(user_input, state, email)
+        
+        # 從 chat_history 中獲取 AI 回應
+        # query_chatgpt 返回的是元組列表 [(user_msg, ai_response), ...]
+        ai_response = "無法獲取回應"
+        if isinstance(chat_history, list) and len(chat_history) > 0:
+            # 獲取最後一個對話元組的第二個元素（AI回應）
+            latest_response = chat_history[-1]
+            if isinstance(latest_response, tuple) and len(latest_response) > 1:
+                ai_response = latest_response[1]
+        
+        # 更新聊天窗口中最後一條消息的回應部分
+        if len(chatbot) > 0:
+            chatbot[-1] = (chatbot[-1][0], ai_response)
+        
         loading_indicator.visible = False
-        return chat_history, state, ""
+        
+        return chatbot, updated_state, ""
+
+    # 更改事件處理
+    user_input.submit(
+        fn=process_input,  # 首先立即顯示用戶訊息
+        inputs=[user_input, chatbot, state, email],
+        outputs=[chatbot, state, user_input],
+    ).then(  # 然後處理API響應
+        fn=process_response,
+        inputs=[chatbot, user_input, state, email],
+        outputs=[chatbot, state, user_input]
+    )
 
     def handle_send_email(email, state):
         if not email:
@@ -543,12 +621,6 @@ with gr.Blocks(
         state = {"step": 0, "dialog_history": [], "current_category": None}
         return "", state
 
-    user_input.submit(
-        process_input,
-        inputs=[user_input, state, email],
-        outputs=[chatbot, state, user_input]
-    )
-    
     send_email_btn.click(
         fn=handle_send_email,
         inputs=[email, state],
