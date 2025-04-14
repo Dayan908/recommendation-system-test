@@ -451,10 +451,32 @@ with gr.Blocks(
         display: none;
         margin: 10px auto;
         text-align: center;
+        padding: 10px;
+        background: rgba(0, 0, 0, 0.05);
+        border-radius: 8px;
+        font-size: 14px;
+        color: #555;
     }
     
     .loading-spinner.active {
         display: block;
+    }
+
+    /* 聊天消息加載中樣式 */
+    .chatbot .message.typing::after {
+        content: "";
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        background-color: #888;
+        border-radius: 50%;
+        margin-left: 3px;
+        animation: typing-dot 1s infinite;
+    }
+
+    @keyframes typing-dot {
+        0%, 100% { opacity: 0.2; }
+        50% { opacity: 1; }
     }
     
     /* 移動端優化 */
@@ -494,6 +516,18 @@ with gr.Blocks(
         animation: shake 0.5s ease-in-out;
     }
 
+    /* 輸入容器樣式 */
+    .chat-input-container {
+        background: white;
+        border-radius: 10px;
+        padding: 10px 15px;
+        margin-top: 5px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        display: flex;
+        align-items: center;
+        width: 100%;  /* 確保容器佔滿整行 */
+    }
+    
     /* 主輸入欄樣式 */
     .main-input {
         margin: 10px 0 !important;
@@ -501,6 +535,7 @@ with gr.Blocks(
         border-radius: 8px !important;
         box-shadow: 0 2px 5px rgba(0,0,0,0.05) !important;
         transition: border-color 0.3s, box-shadow 0.3s !important;
+        flex-grow: 1 !important;  /* 讓輸入框佔據所有可用空間 */
     }
     
     .main-input:focus-within {
@@ -545,17 +580,6 @@ with gr.Blocks(
         }
     }
     
-    /* 輸入容器樣式 */
-    .chat-input-container {
-        background: white;
-        border-radius: 10px;
-        padding: 10px 15px;
-        margin-top: 5px;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-        display: flex;
-        align-items: center;
-    }
-    
     /* 側邊欄容器 */
     .sidebar-container {
         background: white;
@@ -586,21 +610,23 @@ with gr.Blocks(
             # 聊天顯示區域
             with gr.Box(elem_classes="chat-display-container"):
                 loading_indicator = gr.HTML(
-                    '<div class="loading-spinner">處理中...</div>',
+                    '<div class="loading-spinner">ChatGPT 正在思考回應中...</div>',
                     visible=False
                 )
                 chatbot = gr.Chatbot(height=400, elem_classes="chatbot", show_label=False)
             
             # 輸入區域（類似 LINE 的底部輸入框）
             with gr.Box(elem_classes="chat-input-container"):
-                user_input = gr.Textbox(
-                    placeholder="請輸入您的需求...",
-                    show_label=False,
-                    interactive=True,
-                    lines=1,  # 改為單行模式
-                    elem_classes="main-input",
-                    submit_btn="發送"  # 保留發送按鈕
-                )
+                with gr.Row():
+                    user_input = gr.Textbox(
+                        placeholder="請輸入您的需求...",
+                        show_label=False,
+                        interactive=True,
+                        lines=1,  # 單行模式
+                        elem_classes="main-input",
+                        submit_btn="發送",  # 保留發送按鈕
+                        scale=1  # 使其佔據整行
+                    )
         
         # 側邊欄區域（郵件、按鈕和 QR 碼）
         with gr.Column(scale=4, elem_classes="sidebar-container"):
@@ -632,11 +658,18 @@ with gr.Blocks(
         # 先將用戶訊息添加到聊天視窗
         chatbot = chatbot + [(user_input, None)]
         
-        # 立即處理 API 響應
+        # 返回更新後的界面，使用戶訊息立即顯示
+        return chatbot, state, ""
+        
+    # 添加一個新函數來處理 API 響應
+    def process_response(chatbot, state, last_user_input, email):
+        if not chatbot or not last_user_input:
+            return chatbot, state
+            
         loading_indicator.visible = True
         
         # 呼叫原有的 query_chatgpt 函數處理對話
-        chat_history, updated_state = query_chatgpt(user_input, state, email)
+        chat_history, updated_state = query_chatgpt(last_user_input, state, email)
         
         # 從 chat_history 中獲取 AI 回應
         ai_response = "無法獲取回應"
@@ -652,13 +685,17 @@ with gr.Blocks(
         loading_indicator.visible = False
         
         # 返回更新後的界面
-        return chatbot, updated_state, ""
+        return chatbot, updated_state
     
-    # 修改事件處理，將所有邏輯合併到一個函數中
+    # 修改事件處理，分成兩個步驟：先顯示用戶訊息，然後處理響應
     user_input.submit(
-        fn=process_input,
+        fn=process_input,  # 第一步：顯示用戶訊息
         inputs=[user_input, chatbot, state, email],
         outputs=[chatbot, state, user_input]
+    ).then(
+        fn=process_response,  # 第二步：獲取並顯示 AI 響應
+        inputs=[chatbot, state, user_input, email],
+        outputs=[chatbot, state]
     )
 
     def handle_send_email(email, state):
