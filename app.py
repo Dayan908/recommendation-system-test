@@ -335,9 +335,22 @@ with gr.Blocks(
             border-color: #4d4d4d;
         }
         
-        .input-container {
-            background-color: #2d2d2d;
-            border-color: #4d4d4d;
+        .chat-display-container,
+        .chat-input-container,
+        .sidebar-container {
+            background-color: #2d2d2d !important;
+            border-color: #4d4d4d !important;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2) !important;
+        }
+        
+        .main-input textarea {
+            background-color: #3d3d3d !important;
+            color: #e0e0e0 !important;
+            border-color: #4d4d4d !important;
+        }
+        
+        .main-input:focus-within {
+            border-color: #6d7cde !important;
         }
     }
     
@@ -374,6 +387,7 @@ with gr.Blocks(
         display: flex;
         gap: 10px;
         margin-top: 10px;
+        margin-bottom: 15px;
     }
     
     /* 按鈕樣式 */
@@ -443,13 +457,13 @@ with gr.Blocks(
     
     /* 移動端優化 */
     @media (max-width: 768px) {
-        .chat-container {
+        .chat-display-container {
             height: 60vh !important;
         }
         
-        .input-container {
-            margin-top: 10px;
-            padding: 10px;
+        .sidebar-container {
+            margin-left: 0;
+            margin-top: 15px;
         }
         
         .button-container {
@@ -459,6 +473,11 @@ with gr.Blocks(
         .qr-code-image {
             width: 150px;
             height: 150px;
+        }
+        
+        .main-input textarea {
+            padding: 10px !important;
+            min-height: 50px !important;
         }
     }
     
@@ -475,8 +494,7 @@ with gr.Blocks(
 
     /* 主輸入欄樣式 */
     .main-input {
-        margin-top: 15px !important;
-        margin-bottom: 15px !important;
+        margin: 10px 0 !important;
         border: 1px solid #ddd !important;
         border-radius: 8px !important;
         box-shadow: 0 2px 5px rgba(0,0,0,0.05) !important;
@@ -491,15 +509,38 @@ with gr.Blocks(
     .main-input textarea {
         padding: 12px 15px !important;
         font-size: 1.05em !important;
-        min-height: 80px !important;
+        min-height: 60px !important;
     }
     
-    /* 移動端適配 */
-    @media (max-width: 768px) {
-        .main-input textarea {
-            padding: 10px !important;
-            min-height: 60px !important;
-        }
+    /* 聊天容器改為垂直佈局 */
+    .chat-display-container {
+        display: flex;
+        flex-direction: column;
+        height: 460px;
+        margin-bottom: 5px;
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        overflow: hidden;
+    }
+    
+    /* 輸入容器樣式 */
+    .chat-input-container {
+        background: white;
+        border-radius: 10px;
+        padding: 10px;
+        margin-top: 5px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    }
+    
+    /* 側邊欄容器 */
+    .sidebar-container {
+        background: white;
+        border-radius: 10px;
+        padding: 15px;
+        margin-left: 15px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        height: fit-content;
     }
     """
 ) as demo:
@@ -517,24 +558,28 @@ with gr.Blocks(
     state = gr.State({"step": 0, "dialog_history": []})
 
     with gr.Row():
-        with gr.Column(scale=12, elem_classes="chat-container"):
-            loading_indicator = gr.HTML(
-                '<div class="loading-spinner">處理中...</div>',
-                visible=False
-            )
-            chatbot = gr.Chatbot(height=450, elem_classes="chatbot", show_label=False)
+        # 主要聊天區域
+        with gr.Column(scale=12):
+            # 聊天顯示區域
+            with gr.Box(elem_classes="chat-display-container"):
+                loading_indicator = gr.HTML(
+                    '<div class="loading-spinner">處理中...</div>',
+                    visible=False
+                )
+                chatbot = gr.Chatbot(height=400, elem_classes="chatbot", show_label=False)
             
-            # 將輸入需求欄移到這裡，並放大
-            user_input = gr.Textbox(
-                placeholder="請輸入您的需求...",
-                show_label=False,
-                interactive=True,
-                lines=3,  # 增加行數
-                elem_classes="main-input"  # 添加自定義類以便於CSS樣式調整
-            )
-            
-        with gr.Column(scale=4, elem_classes="input-container"):
-            # 移除舊的輸入欄，這裡只保留郵件輸入
+            # 輸入區域（類似 LINE 的底部輸入框）
+            with gr.Box(elem_classes="chat-input-container"):
+                user_input = gr.Textbox(
+                    placeholder="請輸入您的需求...",
+                    show_label=False,
+                    interactive=True,
+                    lines=2,
+                    elem_classes="main-input"
+                )
+        
+        # 側邊欄區域（郵件、按鈕和 QR 碼）
+        with gr.Column(scale=4, elem_classes="sidebar-container"):
             email = gr.Textbox(
                 label="電子郵件",
                 placeholder="請輸入您的電子郵件信箱",
@@ -545,7 +590,7 @@ with gr.Blocks(
                 clear_chat_btn = gr.Button("清除聊天", variant="secondary", elem_classes="button-secondary")
             qr_code = gr.Image(
                 "QRCode.png",
-                show_label=False,  # 移除原本的標籤
+                show_label=False,
                 elem_id="qr_code",
                 elem_classes="qr-code-image",
                 width=200
