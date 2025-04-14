@@ -365,13 +365,15 @@ with gr.Blocks(
     }
     
     /* 聊天容器 */
-    .chat-container { 
-        height: 500px;
-        overflow-y: auto;
-        padding: 20px;
+    .chat-display-container {
+        display: flex;
+        flex-direction: column;
+        height: 460px;
+        margin-bottom: 5px;
         background: white;
         border-radius: 10px;
         box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        overflow: hidden;
     }
     
     /* 輸入區域 */
@@ -509,7 +511,8 @@ with gr.Blocks(
     .main-input textarea {
         padding: 12px 15px !important;
         font-size: 1.05em !important;
-        min-height: 60px !important;
+        min-height: 44px !important;
+        line-height: 20px !important;
     }
     
     /* 提交按鈕樣式 */
@@ -521,6 +524,11 @@ with gr.Blocks(
         border-radius: 4px !important;
         cursor: pointer !important;
         transition: background 0.3s !important;
+        margin-left: 8px !important;
+        height: 36px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
     }
     
     .main-input button[type="submit"]:hover {
@@ -537,25 +545,15 @@ with gr.Blocks(
         }
     }
     
-    /* 聊天容器改為垂直佈局 */
-    .chat-display-container {
-        display: flex;
-        flex-direction: column;
-        height: 460px;
-        margin-bottom: 5px;
-        background: white;
-        border-radius: 10px;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-        overflow: hidden;
-    }
-    
     /* 輸入容器樣式 */
     .chat-input-container {
         background: white;
         border-radius: 10px;
-        padding: 10px;
+        padding: 10px 15px;
         margin-top: 5px;
         box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        display: flex;
+        align-items: center;
     }
     
     /* 側邊欄容器 */
@@ -599,10 +597,9 @@ with gr.Blocks(
                     placeholder="請輸入您的需求...",
                     show_label=False,
                     interactive=True,
-                    lines=2,
+                    lines=1,  # 改為單行模式
                     elem_classes="main-input",
-                    submit_btn="發送",  # 添加提交按鈕
-                    shift_enter=True  # 啟用Shift+Enter進行換行功能
+                    submit_btn="發送"  # 保留發送按鈕
                 )
         
         # 側邊欄區域（郵件、按鈕和 QR 碼）
@@ -635,24 +632,15 @@ with gr.Blocks(
         # 先將用戶訊息添加到聊天視窗
         chatbot = chatbot + [(user_input, None)]
         
-        # 返回更新後的界面
-        return chatbot, state, ""
-    
-    # 定義回調函數來處理API響應 
-    def process_response(chatbot, user_input, state, email):
-        if not user_input.strip():
-            return chatbot, state, ""
-        
+        # 立即處理 API 響應
         loading_indicator.visible = True
         
         # 呼叫原有的 query_chatgpt 函數處理對話
         chat_history, updated_state = query_chatgpt(user_input, state, email)
         
         # 從 chat_history 中獲取 AI 回應
-        # query_chatgpt 返回的是元組列表 [(user_msg, ai_response), ...]
         ai_response = "無法獲取回應"
         if isinstance(chat_history, list) and len(chat_history) > 0:
-            # 獲取最後一個對話元組的第二個元素（AI回應）
             latest_response = chat_history[-1]
             if isinstance(latest_response, tuple) and len(latest_response) > 1:
                 ai_response = latest_response[1]
@@ -663,16 +651,13 @@ with gr.Blocks(
         
         loading_indicator.visible = False
         
+        # 返回更新後的界面
         return chatbot, updated_state, ""
-
-    # 更改事件處理
+    
+    # 修改事件處理，將所有邏輯合併到一個函數中
     user_input.submit(
-        fn=process_input,  # 首先立即顯示用戶訊息
+        fn=process_input,
         inputs=[user_input, chatbot, state, email],
-        outputs=[chatbot, state, user_input],
-    ).then(  # 然後處理API響應
-        fn=process_response,
-        inputs=[chatbot, user_input, state, email],
         outputs=[chatbot, state, user_input]
     )
 
