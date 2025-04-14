@@ -652,18 +652,18 @@ with gr.Blocks(
     # 修改處理輸入的函數，使用戶訊息立即顯示
     def process_input(user_input, chatbot, state, email):
         if not user_input.strip():
-            return chatbot, state, "", user_input  # 修改返回值
+            return chatbot, state, "", ""  # 修改返回值，清空輸入框
         
         # 先將用戶訊息添加到聊天視窗
         chatbot = chatbot + [(user_input, None)]
         
-        # 返回更新後的界面，使用戶訊息立即顯示，並禁用輸入欄
-        return chatbot, state, "", user_input  # 修改返回值
+        # 返回更新後的界面，使用戶訊息立即顯示，並清空輸入框
+        return chatbot, state, "", user_input
         
     # 添加一個新函數來處理 API 響應
     def process_response(chatbot, state, last_user_input, email):
         if not chatbot or not last_user_input:
-            return chatbot, state, user_input  # 修改返回值
+            return chatbot, state, ""  # 修改返回值，確保輸入框為空
             
         loading_indicator.visible = True
         
@@ -690,8 +690,8 @@ with gr.Blocks(
         
         loading_indicator.visible = False
         
-        # 返回更新後的界面並重新啟用輸入欄
-        return chatbot, updated_state, user_input  # 修改返回值
+        # 返回更新後的界面並清空輸入框
+        return chatbot, updated_state, ""
     
     # 修改事件處理，分成兩個步驟：先顯示用戶訊息，然後處理響應
     user_input.submit(
