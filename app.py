@@ -512,6 +512,31 @@ with gr.Blocks(
         min-height: 60px !important;
     }
     
+    /* 提交按鈕樣式 */
+    .main-input button[type="submit"] {
+        background: #4CAF50 !important;
+        border: none !important;
+        color: white !important;
+        padding: 8px 15px !important;
+        border-radius: 4px !important;
+        cursor: pointer !important;
+        transition: background 0.3s !important;
+    }
+    
+    .main-input button[type="submit"]:hover {
+        background: #45a049 !important;
+    }
+    
+    /* 深色模式下的提交按鈕 */
+    @media (prefers-color-scheme: dark) {
+        .main-input button[type="submit"] {
+            background: #5d8b60 !important;
+        }
+        .main-input button[type="submit"]:hover {
+            background: #4a7a4c !important;
+        }
+    }
+    
     /* 聊天容器改為垂直佈局 */
     .chat-display-container {
         display: flex;
@@ -575,7 +600,9 @@ with gr.Blocks(
                     show_label=False,
                     interactive=True,
                     lines=2,
-                    elem_classes="main-input"
+                    elem_classes="main-input",
+                    submit_btn="發送",  # 添加提交按鈕
+                    shift_enter=True  # 啟用Shift+Enter進行換行功能
                 )
         
         # 側邊欄區域（郵件、按鈕和 QR 碼）
