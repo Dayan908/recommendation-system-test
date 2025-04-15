@@ -388,13 +388,13 @@ def calculate_api_cost(response, is_new_conversation=False):
             logging.info(f"持續對話 tokens 明細:")
             logging.info(f"- 輸入 tokens: {prompt_tokens}")
         
-        # gpt-4.1-2025-04-14 的定價
-        input_cost_per_1M = 2.0  # 每 1,000,000 個輸入 token 的價格 ($2/1M)
-        output_cost_per_1M = 8.0  # 每 1,000,000 個輸出 token 的價格 ($8/1M)
+        # o3-mini-2025-01-31 的定價
+        input_cost_per_1k = 0.0005  # 每 1000 個輸入 token 的價格
+        output_cost_per_1k = 0.0015  # 每 1000 個輸出 token 的價格
         
         # 計算本次請求的成本
-        input_cost = (prompt_tokens / 1000000) * input_cost_per_1M
-        output_cost = (completion_tokens / 1000000) * output_cost_per_1M
+        input_cost = (prompt_tokens / 1000) * input_cost_per_1k
+        output_cost = (completion_tokens / 1000) * output_cost_per_1k
         total_cost = input_cost + output_cost
         
         # 更新總成本
@@ -403,7 +403,7 @@ def calculate_api_cost(response, is_new_conversation=False):
         # 記錄詳細的成本信息
         logging.info(f"API 成本計算 - 輸入tokens: {prompt_tokens}, 輸出tokens: {completion_tokens}")
         logging.info(f"成本明細 - 輸入成本: ${input_cost:.6f}, 輸出成本: ${output_cost:.6f}, 總成本: ${total_cost:.6f}")
-        logging.info(f"單價 - 輸入: ${input_cost_per_1M}/1M tokens, 輸出: ${output_cost_per_1M}/1M tokens")
+        logging.info(f"單價 - 輸入: ${input_cost_per_1k}/1K tokens, 輸出: ${output_cost_per_1k}/1K tokens")
         logging.info(f"累計總成本: ${api_cost:.6f}")
         
         return total_cost, api_cost
@@ -488,7 +488,7 @@ def query_chatgpt(user_input, state, email):
         # 建立消息結構 - 使用整個對話歷史而不是每次都重新添加系統提示
         logging.info(f"發送請求 - 對話歷史長度: {len(conversation)}")
         response = openai.ChatCompletion.create(
-            model="gpt-4.1-2025-04-14",
+            model="o3-mini-2025-01-31",
             messages=conversation
         )
 
