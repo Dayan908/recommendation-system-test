@@ -30,6 +30,7 @@ api_cost = 0.0
 system_tokens = 0  # 系統提示的 tokens
 excel_tokens = 0   # Excel 資料的 tokens
 base_tokens = 0  # 用於存儲 system prompt 和 Excel 資料的 tokens
+product_categories = {}  # 初始化產品分類字典
 
 def load_excel_data():
     try:
@@ -60,27 +61,14 @@ def load_excel_data():
 try:
     df = load_excel_data()
     # 建立產品分類緩存
-    product_categories = {}
     for _, row in df.iterrows():
         category = row['產品第一層分類']
         if category not in product_categories:
             product_categories[category] = []
         product_categories[category].append(row.to_dict())
-    
-    # 計算初始 tokens
-    system_tokens = calculate_system_tokens()
-    excel_tokens = calculate_excel_tokens()
-    logging.info(f"初始化完成 - 系統提示 tokens: {system_tokens}, Excel 資料 tokens: {excel_tokens}")
-    
 except Exception as e:
     logging.error(f"初始化數據時發生錯誤: {str(e)}")
     raise
-
-def get_category_products(category):
-    """獲取特定分類的產品數據"""
-    if category in product_categories:
-        return product_categories[category]
-    return []
 
 def count_tokens(text):
     """計算文本的大約 token 數量"""
@@ -91,7 +79,6 @@ def count_tokens(text):
 
 def calculate_system_tokens():
     """計算系統提示的 tokens"""
-    global system_tokens
     try:
         base_system_prompt = """# 角色與目標
 你是智慧照顧產品推薦專家。你的任務是根據客戶的需求，從下方提供的產品資料中，為客戶推薦合適的智慧照顧產品。
@@ -161,16 +148,15 @@ def calculate_system_tokens():
   - 必要時回到步驟一重新確認分類。
   - 根據新資訊調整推薦。
 """
-        system_tokens = count_tokens(base_system_prompt)
-        logging.info(f"系統提示 tokens 計算完成: {system_tokens}")
-        return system_tokens
+        tokens = count_tokens(base_system_prompt)
+        logging.info(f"系統提示 tokens 計算完成: {tokens}")
+        return tokens
     except Exception as e:
         logging.error(f"計算系統提示 tokens 時發生錯誤: {str(e)}")
         return 0
 
 def calculate_excel_tokens():
     """計算 Excel 資料的 tokens"""
-    global excel_tokens
     try:
         excel_text = ""
         for category, products in product_categories.items():
@@ -186,12 +172,23 @@ def calculate_excel_tokens():
                 )
                 excel_text += product_text
         
-        excel_tokens = count_tokens(excel_text)
-        logging.info(f"Excel 資料 tokens 計算完成: {excel_tokens}")
-        return excel_tokens
+        tokens = count_tokens(excel_text)
+        logging.info(f"Excel 資料 tokens 計算完成: {tokens}")
+        return tokens
     except Exception as e:
         logging.error(f"計算 Excel 資料 tokens 時發生錯誤: {str(e)}")
         return 0
+
+# 計算初始 tokens
+system_tokens = calculate_system_tokens()
+excel_tokens = calculate_excel_tokens()
+logging.info(f"初始化完成 - 系統提示 tokens: {system_tokens}, Excel 資料 tokens: {excel_tokens}")
+
+def get_category_products(category):
+    """獲取特定分類的產品數據"""
+    if category in product_categories:
+        return product_categories[category]
+    return []
 
 def calculate_base_tokens():
     """計算系統提示和 Excel 資料的 tokens"""
@@ -266,7 +263,7 @@ def calculate_base_tokens():
   - 必要時回到步驟一重新確認分類。
   - 根據新資訊調整推薦。
 """
-        system_tokens = count_tokens(base_system_prompt)
+        system_tokens = calculate_system_tokens()
         
         # 計算 Excel 資料的 tokens
         excel_text = ""
@@ -283,7 +280,7 @@ def calculate_base_tokens():
                 )
                 excel_text += product_text
         
-        excel_tokens = count_tokens(excel_text)
+        excel_tokens = calculate_excel_tokens()
         
         # 總基礎 tokens
         base_tokens = system_tokens + excel_tokens
