@@ -1013,9 +1013,17 @@ with gr.Blocks(
     def clear_chat(state):
         global conversation, api_cost
         conversation = []
-        state = {"step": 0, "dialog_history": [], "current_category": None}
+        state = {
+            "step": 0,
+            "top_matches": None,
+            "products_info": None,
+            "recommendations": "",
+            "email_content": "",
+            "chat_history": [],
+            "current_category": None
+        }
         # 不重置 api_cost，因為我們要保留總計費用
-        return "", state
+        return [], state, ""  # 返回空的聊天記錄、重置的狀態和空的輸入框
     
     send_email_btn.click(
         fn=handle_send_email,
