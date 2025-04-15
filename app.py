@@ -26,7 +26,10 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 # 全局變數
 conversation = []
 current_step = "步驟零"
-api_cost = 0.0  # 追蹤 API 使用成本
+api_cost = 0.0
+system_tokens = 0  # 系統提示的 tokens
+excel_tokens = 0   # Excel 資料的 tokens
+base_tokens = 0  # 用於存儲 system prompt 和 Excel 資料的 tokens
 
 def load_excel_data():
     try:
@@ -63,6 +66,12 @@ try:
         if category not in product_categories:
             product_categories[category] = []
         product_categories[category].append(row.to_dict())
+    
+    # 計算初始 tokens
+    system_tokens = calculate_system_tokens()
+    excel_tokens = calculate_excel_tokens()
+    logging.info(f"初始化完成 - 系統提示 tokens: {system_tokens}, Excel 資料 tokens: {excel_tokens}")
+    
 except Exception as e:
     logging.error(f"初始化數據時發生錯誤: {str(e)}")
     raise
@@ -73,13 +82,235 @@ def get_category_products(category):
         return product_categories[category]
     return []
 
-# 添加成本計算函數
-def calculate_api_cost(response):
+def count_tokens(text):
+    """計算文本的大約 token 數量"""
+    # 簡單估算：中文每個字約 2 個 token，英文每個單詞約 1.3 個 token
+    chinese_chars = len([c for c in text if '\u4e00' <= c <= '\u9fff'])
+    english_words = len([w for w in text.split() if all(c.isascii() for c in w)])
+    return int(chinese_chars * 2 + english_words * 1.3)
+
+def calculate_system_tokens():
+    """計算系統提示的 tokens"""
+    global system_tokens
+    try:
+        base_system_prompt = """# 角色與目標
+你是智慧照顧產品推薦專家。你的任務是根據客戶的需求，從下方提供的產品資料中，為客戶推薦合適的智慧照顧產品。
+
+# 重要限制
+- 絕對禁止提及或暗示你參考的資料來源。
+- 所有推薦必須自然呈現，如同基於你的專業知識。
+- 請嚴格依照以下推薦流程步驟進行。
+- 任何對話都必須使用繁體中文亦或是使用者使用的語言。
+
+# 推薦流程步驟
+
+## 步驟零：啟動與重置
+- 當客戶表達「開始新諮詢的意圖」時，視為啟動全新的推薦流程
+  - 例如：說「你好」、「我想找產品」、「請推薦」、「重新開始」等類似語句
+- 準備好從資料來源讀取信息，並等待客戶提出初步需求
+- 以友善的招呼語開始，例如：
+  「您好！我是智慧照顧產品推薦專家，請問您在尋找哪方面的協助或產品呢？」
+
+## 步驟一：確認第一層分類
+- 根據客戶的簡短需求，判斷最可能屬於哪一個「產品第一層分類」
+- 向客戶說明判斷的分類，並解釋該分類包含的產品類型
+- 詢問此方向是否符合客戶需求
+- 必須先完成此分類確認，請勿直接跳至第二層分類
+- 對話範例：
+  「聽起來您可能在尋找與『居家安全監控』相關的產品，這類產品通常用於偵測跌倒、異常離床或提供緊急呼叫功能。請問這個方向是您想要的嗎？」
+
+## 步驟二：探索第二層分類需求
+- 在確認第一層分類後，仔細閱讀該分類下所有產品的功能和使用方式
+- 根據產品差異，提出具體問題引導客戶
+- 問題可圍繞：
+  - 功能偏好
+  - 使用場景
+  - 操作方式
+- 對話範例：
+  「為了更精確地推薦，請問您：
+  1. 比較重視『自動偵測並發出警報』（如跌倒偵測），還是『主動求助』（如緊急按鈕）的功能？
+  2. 對於安裝方式（固定式或穿戴式）您有特別偏好嗎？」
+
+## 步驟三：統整與確認需求
+- 統整所有需求資訊
+- 指出對應的「產品第二層分類」
+- 向客戶複述完整需求並請求確認
+- 確認範例：
+  「好的，讓我整理一下您的需求：
+  - 第一層分類：『居家安全監控』
+  - 特別需求：『自動偵測異常狀態，如跌倒』功能
+  - 偏好：非穿戴式設備
+  請問我的理解正確嗎？」
+
+## 步驟四：提供產品推薦
+- 在確認需求無誤後，從下方提供的「產品資訊」中篩選最符合的產品。
+- 至少推薦三項產品。
+- **對於每項推薦的產品，請務必使用提供的完整資訊，包含：**
+  1.  **產品名稱**
+  2.  **公司名稱**
+  3.  **主要功能與特色**
+  4.  **產品網址**
+  5.  **廠商連絡電話**
+
+## 步驟五：滿意度詢問與後續
+- 詢問：「請問以上推薦的產品是否符合您的期待？」
+- 如果滿意：
+  「如果您對這次的推薦感到滿意，請在下方提供您的電子郵件地址，我會將推薦結果整理後寄送給您。」
+- 如果不滿意：
+  - 回到步驟二重新詢問需求。
+  - 必要時回到步驟一重新確認分類。
+  - 根據新資訊調整推薦。
+"""
+        system_tokens = count_tokens(base_system_prompt)
+        logging.info(f"系統提示 tokens 計算完成: {system_tokens}")
+        return system_tokens
+    except Exception as e:
+        logging.error(f"計算系統提示 tokens 時發生錯誤: {str(e)}")
+        return 0
+
+def calculate_excel_tokens():
+    """計算 Excel 資料的 tokens"""
+    global excel_tokens
+    try:
+        excel_text = ""
+        for category, products in product_categories.items():
+            for product in products:
+                product_text = (
+                    f"產品名稱：{product.get('產品名稱', 'N/A')}\n"
+                    f"公司名稱：{product.get('公司名稱', 'N/A')}\n"
+                    f"主要功能：{product.get('主要功能', 'N/A')}\n"
+                    f"使用方式：{product.get('使用方式', 'N/A')}\n"
+                    f"產品網址：{product.get('產品網址', 'N/A')}\n"
+                    f"連絡電話：{product.get('連絡電話', 'N/A')}\n"
+                    f"分類：{product.get('產品第一層分類', 'N/A')} > {product.get('產品第二層分類', 'N/A')}\n"
+                )
+                excel_text += product_text
+        
+        excel_tokens = count_tokens(excel_text)
+        logging.info(f"Excel 資料 tokens 計算完成: {excel_tokens}")
+        return excel_tokens
+    except Exception as e:
+        logging.error(f"計算 Excel 資料 tokens 時發生錯誤: {str(e)}")
+        return 0
+
+def calculate_base_tokens():
+    """計算系統提示和 Excel 資料的 tokens"""
+    global base_tokens
+    try:
+        # 計算 system prompt 的 tokens
+        base_system_prompt = """# 角色與目標
+你是智慧照顧產品推薦專家。你的任務是根據客戶的需求，從下方提供的產品資料中，為客戶推薦合適的智慧照顧產品。
+
+# 重要限制
+- 絕對禁止提及或暗示你參考的資料來源。
+- 所有推薦必須自然呈現，如同基於你的專業知識。
+- 請嚴格依照以下推薦流程步驟進行。
+- 任何對話都必須使用繁體中文亦或是使用者使用的語言。
+
+# 推薦流程步驟
+
+## 步驟零：啟動與重置
+- 當客戶表達「開始新諮詢的意圖」時，視為啟動全新的推薦流程
+  - 例如：說「你好」、「我想找產品」、「請推薦」、「重新開始」等類似語句
+- 準備好從資料來源讀取信息，並等待客戶提出初步需求
+- 以友善的招呼語開始，例如：
+  「您好！我是智慧照顧產品推薦專家，請問您在尋找哪方面的協助或產品呢？」
+
+## 步驟一：確認第一層分類
+- 根據客戶的簡短需求，判斷最可能屬於哪一個「產品第一層分類」
+- 向客戶說明判斷的分類，並解釋該分類包含的產品類型
+- 詢問此方向是否符合客戶需求
+- 必須先完成此分類確認，請勿直接跳至第二層分類
+- 對話範例：
+  「聽起來您可能在尋找與『居家安全監控』相關的產品，這類產品通常用於偵測跌倒、異常離床或提供緊急呼叫功能。請問這個方向是您想要的嗎？」
+
+## 步驟二：探索第二層分類需求
+- 在確認第一層分類後，仔細閱讀該分類下所有產品的功能和使用方式
+- 根據產品差異，提出具體問題引導客戶
+- 問題可圍繞：
+  - 功能偏好
+  - 使用場景
+  - 操作方式
+- 對話範例：
+  「為了更精確地推薦，請問您：
+  1. 比較重視『自動偵測並發出警報』（如跌倒偵測），還是『主動求助』（如緊急按鈕）的功能？
+  2. 對於安裝方式（固定式或穿戴式）您有特別偏好嗎？」
+
+## 步驟三：統整與確認需求
+- 統整所有需求資訊
+- 指出對應的「產品第二層分類」
+- 向客戶複述完整需求並請求確認
+- 確認範例：
+  「好的，讓我整理一下您的需求：
+  - 第一層分類：『居家安全監控』
+  - 特別需求：『自動偵測異常狀態，如跌倒』功能
+  - 偏好：非穿戴式設備
+  請問我的理解正確嗎？」
+
+## 步驟四：提供產品推薦
+- 在確認需求無誤後，從下方提供的「產品資訊」中篩選最符合的產品。
+- 至少推薦三項產品。
+- **對於每項推薦的產品，請務必使用提供的完整資訊，包含：**
+  1.  **產品名稱**
+  2.  **公司名稱**
+  3.  **主要功能與特色**
+  4.  **產品網址**
+  5.  **廠商連絡電話**
+
+## 步驟五：滿意度詢問與後續
+- 詢問：「請問以上推薦的產品是否符合您的期待？」
+- 如果滿意：
+  「如果您對這次的推薦感到滿意，請在下方提供您的電子郵件地址，我會將推薦結果整理後寄送給您。」
+- 如果不滿意：
+  - 回到步驟二重新詢問需求。
+  - 必要時回到步驟一重新確認分類。
+  - 根據新資訊調整推薦。
+"""
+        system_tokens = count_tokens(base_system_prompt)
+        
+        # 計算 Excel 資料的 tokens
+        excel_text = ""
+        for category, products in product_categories.items():
+            for product in products:
+                product_text = (
+                    f"產品名稱：{product.get('產品名稱', 'N/A')}\n"
+                    f"公司名稱：{product.get('公司名稱', 'N/A')}\n"
+                    f"主要功能：{product.get('主要功能', 'N/A')}\n"
+                    f"使用方式：{product.get('使用方式', 'N/A')}\n"
+                    f"產品網址：{product.get('產品網址', 'N/A')}\n"
+                    f"連絡電話：{product.get('連絡電話', 'N/A')}\n"
+                    f"分類：{product.get('產品第一層分類', 'N/A')} > {product.get('產品第二層分類', 'N/A')}\n"
+                )
+                excel_text += product_text
+        
+        excel_tokens = count_tokens(excel_text)
+        
+        # 總基礎 tokens
+        base_tokens = system_tokens + excel_tokens
+        logging.info(f"基礎 tokens 計算完成 - 系統提示: {system_tokens}, Excel 資料: {excel_tokens}")
+        
+    except Exception as e:
+        logging.error(f"計算基礎 tokens 時發生錯誤: {str(e)}")
+        base_tokens = 0
+
+# 在初始化時計算基礎 tokens
+try:
+    calculate_base_tokens()
+except Exception as e:
+    logging.error(f"初始化基礎 tokens 時發生錯誤: {str(e)}")
+
+def calculate_api_cost(response, is_new_conversation=False):
+    """計算 API 使用成本"""
     global api_cost
     try:
         # 獲取輸入和輸出的 token 數量
         prompt_tokens = response.usage.prompt_tokens
         completion_tokens = response.usage.completion_tokens
+        
+        # 如果是新對話，加入系統提示和 Excel 資料的 tokens
+        if is_new_conversation:
+            prompt_tokens += system_tokens + excel_tokens
+            logging.info(f"新對話 - 加入基礎 tokens: 系統提示({system_tokens}) + Excel資料({excel_tokens})")
         
         # o3-mini-2025-01-31 的定價
         input_cost_per_1k = 0.0005  # 每 1000 個輸入 token 的價格
@@ -93,6 +324,10 @@ def calculate_api_cost(response):
         # 更新總成本
         api_cost += total_cost
         
+        # 記錄詳細的成本信息
+        logging.info(f"API 成本計算 - 輸入tokens: {prompt_tokens}, 輸出tokens: {completion_tokens}")
+        logging.info(f"成本明細 - 輸入成本: ${input_cost:.4f}, 輸出成本: ${output_cost:.4f}, 總成本: ${total_cost:.4f}")
+        
         return total_cost, api_cost
     except Exception as e:
         logging.error(f"計算 API 成本時發生錯誤: {str(e)}")
@@ -100,6 +335,14 @@ def calculate_api_cost(response):
 
 def query_chatgpt(user_input, state, email):
     global conversation, current_step, api_cost
+    
+    # 判斷是否是新對話
+    is_new_conversation = (
+        "你好" in user_input or 
+        "開始" in user_input or 
+        "重新" in user_input or
+        len(conversation) == 0
+    )
     
     try:
         # 基礎系統提示
@@ -220,8 +463,8 @@ def query_chatgpt(user_input, state, email):
             ]
         )
 
-        # 計算本次請求的成本
-        current_cost, total_cost = calculate_api_cost(response)
+        # 計算本次請求的成本，傳入是否新對話的標記
+        current_cost, total_cost = calculate_api_cost(response, is_new_conversation)
         
         reply = response.choices[0].message.content
         conversation.append({"role": "assistant", "content": reply})
@@ -768,10 +1011,11 @@ with gr.Blocks(
         return [("Assistant", result)]
 
     def clear_chat(state):
-        global conversation
+        global conversation, api_cost
         conversation = []
         state = {"step": 0, "dialog_history": [], "current_category": None}
-        return "", state, True  # 確保清除聊天後輸入欄啟用
+        # 不重置 api_cost，因為我們要保留總計費用
+        return "", state, True
     
     send_email_btn.click(
         fn=handle_send_email,
