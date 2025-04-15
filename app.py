@@ -389,13 +389,13 @@ def calculate_api_cost(response, is_new_conversation=False):
             logging.info(f"持續對話 tokens 明細:")
             logging.info(f"- 輸入 tokens: {prompt_tokens}")
         
-        # o3-mini-2025-01-31 的定價
-        input_cost_per_1k = 0.0005  # 每 1000 個輸入 token 的價格
-        output_cost_per_1k = 0.0015  # 每 1000 個輸出 token 的價格
+        # o3-mini-2025-01-31 的定價 (更新後)
+        input_cost_per_1M = 1.1  # 每 1,000,000 個輸入 token 的價格 ($1.1/1M)
+        output_cost_per_1M = 4.4  # 每 1,000,000 個輸出 token 的價格 ($4.4/1M)
         
         # 計算本次請求的成本
-        input_cost = (prompt_tokens / 1000) * input_cost_per_1k
-        output_cost = (completion_tokens / 1000) * output_cost_per_1k
+        input_cost = (prompt_tokens / 1000000) * input_cost_per_1M
+        output_cost = (completion_tokens / 1000000) * output_cost_per_1M
         total_cost = input_cost + output_cost
         
         # 更新總成本
@@ -404,7 +404,7 @@ def calculate_api_cost(response, is_new_conversation=False):
         # 記錄詳細的成本信息
         logging.info(f"API 成本計算 - 輸入tokens: {prompt_tokens}, 輸出tokens: {completion_tokens}")
         logging.info(f"成本明細 - 輸入成本: ${input_cost:.6f}, 輸出成本: ${output_cost:.6f}, 總成本: ${total_cost:.6f}")
-        logging.info(f"單價 - 輸入: ${input_cost_per_1k}/1K tokens, 輸出: ${output_cost_per_1k}/1K tokens")
+        logging.info(f"單價 - 輸入: ${input_cost_per_1M}/1M tokens, 輸出: ${output_cost_per_1M}/1M tokens")
         logging.info(f"累計總成本: ${api_cost:.6f}")
         
         return total_cost, api_cost
