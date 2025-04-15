@@ -382,10 +382,11 @@ def calculate_api_cost(response, is_new_conversation=False):
         # 記錄詳細的 tokens 信息
         if is_new_conversation:
             logging.info(f"新對話 tokens 明細:")
-            logging.info(f"- 系統提示 tokens: {system_tokens}")
-            logging.info(f"- Excel 資料 tokens: {excel_tokens}")
-            logging.info(f"- 用戶輸入 tokens: {prompt_tokens - system_tokens - excel_tokens}")
+            logging.info(f"- 系統提示+產品資料 tokens: {prompt_tokens}")
             logging.info(f"- 總輸入 tokens: {prompt_tokens}")
+        else:
+            logging.info(f"持續對話 tokens 明細:")
+            logging.info(f"- 輸入 tokens: {prompt_tokens}")
         
         # o3-mini-2025-01-31 的定價
         input_cost_per_1k = 0.0005  # 每 1000 個輸入 token 的價格
@@ -431,57 +432,52 @@ def query_chatgpt(user_input, state, email):
         if len(conversation) > 20:  # 每輪對話包含 user 和 assistant 各一條消息
             conversation = conversation[-20:]
         
-        # 獲取相關產品資訊
-        relevant_products = []
-        if "current_category" in state and state["current_category"]:
-            products = product_categories.get(state["current_category"], [])
-            relevant_products.extend(products)
-        else:
-            for category, products in product_categories.items():
+        # 獲取相關產品資訊 - 僅在新對話時使用
+        if is_new_conversation:
+            relevant_products = []
+            if "current_category" in state and state["current_category"]:
+                products = product_categories.get(state["current_category"], [])
                 relevant_products.extend(products)
-
-        # 將產品資訊轉換為更清晰的格式
-        products_info = []
-        for product in relevant_products:
-            product_info = (
-                f"產品名稱：{product.get('產品名稱', 'N/A')}\n"
-                f"公司名稱：{product.get('公司名稱', 'N/A')}\n"
-                f"主要功能：{product.get('主要功能', 'N/A')}\n"
-                f"使用方式：{product.get('使用方式', 'N/A')}\n"
-                f"產品網址：{product.get('產品網址', 'N/A')}\n"
-                f"連絡電話：{product.get('連絡電話', 'N/A')}\n"
-                f"分類：{product.get('產品第一層分類', 'N/A')} > {product.get('產品第二層分類', 'N/A')}\n"
-                f"---"
+            else:
+                for category, products in product_categories.items():
+                    relevant_products.extend(products)
+    
+            # 將產品資訊轉換為更清晰的格式
+            products_info = []
+            for product in relevant_products:
+                product_info = (
+                    f"產品名稱：{product.get('產品名稱', 'N/A')}\n"
+                    f"公司名稱：{product.get('公司名稱', 'N/A')}\n"
+                    f"主要功能：{product.get('主要功能', 'N/A')}\n"
+                    f"使用方式：{product.get('使用方式', 'N/A')}\n"
+                    f"產品網址：{product.get('產品網址', 'N/A')}\n"
+                    f"連絡電話：{product.get('連絡電話', 'N/A')}\n"
+                    f"分類：{product.get('產品第一層分類', 'N/A')} > {product.get('產品第二層分類', 'N/A')}\n"
+                    f"---"
+                )
+                products_info.append(product_info)
+    
+            # 添加分類資訊
+            categories_info = "可用分類：\n" + "\n".join([f"- {cat}" for cat in product_categories.keys()])
+            
+            # 組合完整的system prompt
+            system_prompt = (
+                base_system_prompt + "\n\n" +
+                categories_info + "\n\n" +
+                "==== 產品資訊 ====\n" + "\n".join(products_info) + "\n==== 產品資訊結束 ===="
             )
-            products_info.append(product_info)
+            
+            # 將系統提示添加為第一條消息
+            conversation = [{"role": "system", "content": system_prompt}]
+            logging.info("已添加系統提示和產品資訊到對話歷史中")
 
-        # 添加分類資訊
-        categories_info = "可用分類：\n" + "\n".join([f"- {cat}" for cat in product_categories.keys()])
-        
-        # 組合完整的system prompt
-        system_prompt = (
-            base_system_prompt + "\n\n" +
-            categories_info + "\n\n" +
-            "==== 產品資訊 ====\n" + "\n".join(products_info) + "\n==== 產品資訊結束 ===="
-        )
-
+        # 添加用戶消息到對話歷史
         conversation.append({"role": "user", "content": user_input})
 
-        # 優化 messages 結構
-        messages = [
-            {"role": "system", "content": system_prompt}
-        ]
-        
-        # 只在非新對話時添加對話歷史
-        if not is_new_conversation:
-            messages.extend(conversation)
-        else:
-            # 新對話時只添加當前用戶輸入
-            messages.append({"role": "user", "content": user_input})
-
+        # 建立消息結構 - 使用整個對話歷史而不是每次都重新添加系統提示
         response = openai.ChatCompletion.create(
             model="o3-mini-2025-01-31",
-            messages=messages
+            messages=conversation
         )
 
         # 計算本次請求的成本
@@ -503,8 +499,11 @@ def query_chatgpt(user_input, state, email):
         state["recommendations"] = reply
         state["email_content"] = reply
 
-        conversation_history = [(conversation[i]['content'], conversation[i+1]['content']) 
-                              for i in range(0, len(conversation) - 1, 2)]
+        # 創建對話歷史 - 跳過第一條系統消息
+        conversation_history = []
+        for i in range(1, len(conversation) - 1, 2):
+            if i+1 < len(conversation):
+                conversation_history.append((conversation[i]['content'], conversation[i+1]['content']))
 
         logging.info("成功生成推薦回應")
         return conversation_history, state
