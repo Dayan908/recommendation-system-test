@@ -32,6 +32,7 @@ system_tokens = 0  # 系統提示的 tokens
 excel_tokens = 0   # Excel 資料的 tokens
 base_tokens = 0  # 用於存儲 system prompt 和 Excel 資料的 tokens
 product_categories = {}  # 初始化產品分類字典
+system_prompt_loaded = False  # 追蹤系統提示是否已加載
 
 # 定義系統提示
 base_system_prompt = """# 角色與目標
@@ -411,27 +412,27 @@ def calculate_api_cost(response, is_new_conversation=False):
         logging.error(f"計算 API 成本時發生錯誤: {str(e)}")
         return 0.0, api_cost
 
-# 添加全局變數追蹤是否已加載系統提示
-system_prompt_loaded = False
-
 def query_chatgpt(user_input, state, email):
     global conversation, current_step, api_cost, system_prompt_loaded
+    
+    # 將debug信息添加到日誌
+    logging.info(f"查詢前狀態 - system_prompt_loaded: {system_prompt_loaded}, 對話長度: {len(conversation)}")
     
     # 判斷是否是新對話
     is_new_conversation = (
         "你好" in user_input or 
         "開始" in user_input or 
         "重新" in user_input or
-        len(conversation) == 0 or
-        not system_prompt_loaded
+        len(conversation) == 0
     )
     
     try:
-        # 如果是新對話，清空對話歷史
+        # 如果是新對話，清空對話歷史和系統提示狀態
         if is_new_conversation:
             conversation = []
             system_prompt_loaded = False
             logging.info(f"開始新對話 - 基礎 tokens: 系統提示({system_tokens}) + Excel資料({excel_tokens}) = {system_tokens + excel_tokens}")
+            logging.info(f"重置系統提示狀態: system_prompt_loaded = {system_prompt_loaded}")
         
         # 限制對話歷史長度，只保留最近的 10 輪對話
         if len(conversation) > 20:  # 每輪對話包含 user 和 assistant 各一條消息
@@ -441,9 +442,13 @@ def query_chatgpt(user_input, state, email):
             # 如果原本有系統提示但被清理掉了，重新添加
             if system_message and (not conversation or conversation[0]["role"] != "system"):
                 conversation.insert(0, system_message)
+                # 確保系統提示標記保持為真
+                system_prompt_loaded = True
+                logging.info("對話歷史截斷，已保留系統提示")
         
         # 只在系統提示未加載時加載
         if not system_prompt_loaded:
+            logging.info("需要加載系統提示")
             relevant_products = []
             if "current_category" in state and state["current_category"]:
                 products = product_categories.get(state["current_category"], [])
@@ -477,19 +482,38 @@ def query_chatgpt(user_input, state, email):
                 "==== 產品資訊 ====\n" + "\n".join(products_info) + "\n==== 產品資訊結束 ===="
             )
             
-            # 將系統提示添加為第一條消息
-            conversation = [{"role": "system", "content": system_prompt}]
+            # 將系統提示添加為第一條消息，確保清除之前的對話歷史
+            if len(conversation) > 0 and conversation[0]["role"] == "system":
+                # 如果已有system消息，替換它
+                conversation[0] = {"role": "system", "content": system_prompt}
+            else:
+                # 否則添加新的system消息
+                conversation.insert(0, {"role": "system", "content": system_prompt})
+            
             system_prompt_loaded = True
             logging.info("已添加系統提示和產品資訊到對話歷史中")
+            logging.info(f"系統提示狀態更新: system_prompt_loaded = {system_prompt_loaded}")
+        else:
+            logging.info("系統提示已加載，無需重新加載")
 
         # 添加用戶消息到對話歷史
         conversation.append({"role": "user", "content": user_input})
 
         # 建立消息結構 - 使用整個對話歷史而不是每次都重新添加系統提示
-        logging.info(f"發送請求 - 對話歷史長度: {len(conversation)}")
+        # 創建一個副本以避免修改原始對話歷史
+        messages_to_send = conversation.copy()
+        
+        # 確保messages_to_send中system消息只在第一位置
+        if len(messages_to_send) > 0 and messages_to_send[0]["role"] == "system":
+            # 記錄發送的對話長度和第一條消息類型
+            logging.info(f"發送請求 - 對話歷史長度: {len(messages_to_send)}, 第一條消息類型: {messages_to_send[0]['role']}")
+            logging.info(f"前10個字符: {messages_to_send[0]['content'][:10]}...")
+        else:
+            logging.warning("警告: 發送請求中沒有系統提示消息")
+            
         response = openai.ChatCompletion.create(
             model="o3-mini-2025-01-31",
-            messages=conversation
+            messages=messages_to_send
         )
 
         # 計算本次請求的成本
@@ -518,6 +542,7 @@ def query_chatgpt(user_input, state, email):
                 conversation_history.append((conversation[i]['content'], conversation[i+1]['content']))
 
         logging.info("成功生成推薦回應")
+        logging.info(f"查詢後狀態 - system_prompt_loaded: {system_prompt_loaded}, 對話長度: {len(conversation)}")
         return conversation_history, state
 
     except Exception as e:
