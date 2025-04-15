@@ -4,6 +4,7 @@ import pandas as pd
 import os
 import smtplib
 import logging
+import tiktoken
 from datetime import datetime
 from dotenv import load_dotenv
 from email.mime.multipart import MIMEMultipart
@@ -71,11 +72,15 @@ except Exception as e:
     raise
 
 def count_tokens(text):
-    """計算文本的大約 token 數量"""
-    # 簡單估算：中文每個字約 2 個 token，英文每個單詞約 1.3 個 token
-    chinese_chars = len([c for c in text if '\u4e00' <= c <= '\u9fff'])
-    english_words = len([w for w in text.split() if all(c.isascii() for c in w)])
-    return int(chinese_chars * 2 + english_words * 1.3)
+    """使用 tiktoken 計算文本的 token 數量"""
+    try:
+        # 使用 o3-mini-2025-01-31 模型對應的編碼器
+        encoding = tiktoken.get_encoding("cl100k_base")
+        tokens = len(encoding.encode(text))
+        return tokens
+    except Exception as e:
+        logging.error(f"計算 tokens 時發生錯誤: {str(e)}")
+        return 0
 
 def calculate_system_tokens():
     """計算系統提示的 tokens"""
@@ -469,19 +474,6 @@ def query_chatgpt(user_input, state, email):
         # 添加成本信息到回覆中
         cost_info = f"\n\n[本次請求成本: ${current_cost:.4f} | 累計成本: ${total_cost:.4f}]"
         reply += cost_info
-
-        # --- 新增：保存對話紀錄 ---
-        try:
-            log_file = "conversation_log.txt"
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            with open(log_file, 'a', encoding='utf-8') as f:
-                f.write(f"[{timestamp}] User: {user_input}\\n")
-                f.write(f"[{timestamp}] ChatGPT: {reply}\\n")
-                f.write("---\\n")  # 添加分隔符
-            logging.info(f"成功將對話紀錄寫入 {log_file}")
-        except Exception as log_e:
-            logging.error(f"寫入對話紀錄時發生錯誤: {str(log_e)}")
-        # --- 新增結束 ---
 
         # 更新當前分類（如果在回覆中提到）
         for category in product_categories.keys():
@@ -1013,7 +1005,7 @@ with gr.Blocks(
         conversation = []
         state = {"step": 0, "dialog_history": [], "current_category": None}
         # 不重置 api_cost，因為我們要保留總計費用
-        return "", state, True
+        return "", state
     
     send_email_btn.click(
         fn=handle_send_email,
