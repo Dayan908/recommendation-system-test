@@ -415,6 +415,7 @@ def query_chatgpt(user_input, state, email):
         # 如果是新對話，清空對話歷史
         if is_new_conversation:
             conversation = []
+            logging.info(f"開始新對話 - 基礎 tokens: 系統提示({system_tokens}) + Excel資料({excel_tokens}) = {system_tokens + excel_tokens}")
         
         # 限制對話歷史長度，只保留最近的 10 輪對話
         if len(conversation) > 20:  # 每輪對話包含 user 和 assistant 各一條消息
@@ -423,13 +424,11 @@ def query_chatgpt(user_input, state, email):
         # 獲取相關產品資訊
         relevant_products = []
         if "current_category" in state and state["current_category"]:
-            # 如果已經確定了分類，獲取該分類的所有產品
             products = product_categories.get(state["current_category"], [])
             relevant_products.extend(products)
         else:
-            # 如果還沒有確定分類，獲取所有產品
             for category, products in product_categories.items():
-                relevant_products.extend(products)  # 獲取所有產品，不限制數量
+                relevant_products.extend(products)
 
         # 將產品資訊轉換為更清晰的格式
         products_info = []
@@ -448,34 +447,32 @@ def query_chatgpt(user_input, state, email):
 
         # 添加分類資訊
         categories_info = "可用分類：\n" + "\n".join([f"- {cat}" for cat in product_categories.keys()])
-        
-        # 組合完整的system prompt
-        system_prompt = (
-            base_system_prompt + "\n\n" +
-            categories_info + "\n\n" +
-            "==== 產品資訊 ====\n" + "\n".join(products_info) + "\n==== 產品資訊結束 ===="
-        )
 
         conversation.append({"role": "user", "content": user_input})
 
         # 優化 messages 結構
-        messages = [
-            {"role": "system", "content": system_prompt}
-        ]
+        messages = []
         
-        # 只在非新對話時添加對話歷史
-        if not is_new_conversation:
-            messages.extend(conversation)
-        else:
-            # 新對話時只添加當前用戶輸入
+        # 在新對話時，添加完整的系統提示和產品資訊
+        if is_new_conversation:
+            system_content = (
+                base_system_prompt + "\n\n" +
+                categories_info + "\n\n" +
+                "==== 產品資訊 ====\n" + "\n".join(products_info) + "\n==== 產品資訊結束 ===="
+            )
+            messages.append({"role": "system", "content": system_content})
             messages.append({"role": "user", "content": user_input})
+        else:
+            # 非新對話時，使用簡化的系統提示
+            messages.append({"role": "system", "content": base_system_prompt})
+            messages.extend(conversation)
 
         response = openai.ChatCompletion.create(
             model="o3-mini-2025-01-31",
             messages=messages
         )
 
-        # 計算本次請求的成本，傳入是否新對話的標記
+        # 計算本次請求的成本
         current_cost, total_cost = calculate_api_cost(response, is_new_conversation)
         
         reply = response.choices[0].message.content
