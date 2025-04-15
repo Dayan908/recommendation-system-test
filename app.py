@@ -499,18 +499,22 @@ def query_chatgpt(user_input, state, email):
         # 添加用戶消息到對話歷史
         conversation.append({"role": "user", "content": user_input})
 
-        # 建立消息結構 - 使用整個對話歷史而不是每次都重新添加系統提示
-        # 創建一個副本以避免修改原始對話歷史
-        messages_to_send = conversation.copy()
-        
-        # 確保messages_to_send中system消息只在第一位置
-        if len(messages_to_send) > 0 and messages_to_send[0]["role"] == "system":
-            # 記錄發送的對話長度和第一條消息類型
-            logging.info(f"發送請求 - 對話歷史長度: {len(messages_to_send)}, 第一條消息類型: {messages_to_send[0]['role']}")
-            logging.info(f"前10個字符: {messages_to_send[0]['content'][:10]}...")
+        # --- 修改開始：根據是否為首次請求，決定發送的 messages 內容 ---
+        if system_prompt_loaded and not is_new_conversation:
+            # 持續對話：只發送用戶和助手的歷史消息，跳過第一個系統消息
+            # 注意：這可能會導致模型失去上下文
+            messages_to_send = conversation[1:].copy() 
+            logging.info(f"發送請求 (持續對話) - 對話歷史長度: {len(messages_to_send)}, 已移除系統提示")
         else:
-            logging.warning("警告: 發送請求中沒有系統提示消息")
-            
+            # 首次對話或剛加載系統提示：發送包含系統提示的完整對話
+            messages_to_send = conversation.copy()
+            if messages_to_send and messages_to_send[0]["role"] == "system":
+                 logging.info(f"發送請求 (首次) - 對話歷史長度: {len(messages_to_send)}, 第一條消息類型: {messages_to_send[0]['role']}")
+                 logging.info(f"前10個字符: {messages_to_send[0]['content'][:10]}...")
+            else:
+                 logging.warning("警告: 首次發送請求中沒有系統提示消息")
+        # --- 修改結束 ---
+
         response = openai.ChatCompletion.create(
             model="o3-mini-2025-01-31",
             messages=messages_to_send
