@@ -457,25 +457,27 @@ def query_chatgpt(user_input, state, email):
 
         # 添加分類資訊
         categories_info = "可用分類：\n" + "\n".join([f"- {cat}" for cat in product_categories.keys()])
+        
+        # 組合完整的system prompt
+        system_prompt = (
+            base_system_prompt + "\n\n" +
+            categories_info + "\n\n" +
+            "==== 產品資訊 ====\n" + "\n".join(products_info) + "\n==== 產品資訊結束 ===="
+        )
 
         conversation.append({"role": "user", "content": user_input})
 
         # 優化 messages 結構
-        messages = []
+        messages = [
+            {"role": "system", "content": system_prompt}
+        ]
         
-        # 在新對話時，添加完整的系統提示和產品資訊
-        if is_new_conversation:
-            system_content = (
-                base_system_prompt + "\n\n" +
-                categories_info + "\n\n" +
-                "==== 產品資訊 ====\n" + "\n".join(products_info) + "\n==== 產品資訊結束 ===="
-            )
-            messages.append({"role": "system", "content": system_content})
-            messages.append({"role": "user", "content": user_input})
-        else:
-            # 非新對話時，使用簡化的系統提示
-            messages.append({"role": "system", "content": base_system_prompt})
+        # 只在非新對話時添加對話歷史
+        if not is_new_conversation:
             messages.extend(conversation)
+        else:
+            # 新對話時只添加當前用戶輸入
+            messages.append({"role": "user", "content": user_input})
 
         response = openai.ChatCompletion.create(
             model="o3-mini-2025-01-31",
