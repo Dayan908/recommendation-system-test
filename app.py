@@ -714,7 +714,7 @@ with gr.Blocks(
     # 添加一個新函數來處理 API 響應
     def process_response(chatbot, state, last_user_input, email):
         if not chatbot or not last_user_input:
-            return chatbot, state, ""
+            return chatbot, state, "", cost_display
             
         loading_indicator.visible = True
         
@@ -722,7 +722,7 @@ with gr.Blocks(
             chat_history, updated_state = query_chatgpt(last_user_input, state, email)
             
             # 更新成本顯示
-            cost_display.value = f"API 使用成本: ${api_cost:.4f}"
+            cost_display.update(value=f"API 使用成本: ${api_cost:.4f}")
             
             # 從 chat_history 中獲取 AI 回應
             ai_response = "無法獲取回應"
@@ -736,7 +736,6 @@ with gr.Blocks(
                 chatbot[-1] = (chatbot[-1][0], ai_response)
             
         except Exception as e:
-            # 處理可能的錯誤
             logging.error(f"處理回應時發生錯誤: {str(e)}")
             if len(chatbot) > 0:
                 chatbot[-1] = (chatbot[-1][0], "抱歉，處理您的請求時發生錯誤，請重試。")
@@ -744,17 +743,17 @@ with gr.Blocks(
         loading_indicator.visible = False
         
         # 返回更新後的界面並清空輸入框
-        return chatbot, updated_state, ""
+        return chatbot, updated_state, "", cost_display
     
-    # 修改事件處理，分成兩個步驟：先顯示用戶訊息，然後處理響應
+    # 修改事件處理，添加成本顯示的更新
     user_input.submit(
-        fn=process_input,  # 第一步：顯示用戶訊息
+        fn=process_input,
         inputs=[user_input, chatbot, state, email],
-        outputs=[chatbot, state, user_input, user_input]  # 修改这里，使用组件而不是布尔值
+        outputs=[chatbot, state, user_input, user_input]
     ).then(
-        fn=process_response,  # 第二步：獲取並顯示 AI 響應
+        fn=process_response,
         inputs=[chatbot, state, user_input, email],
-        outputs=[chatbot, state, user_input]  # 修改这里，使用组件而不是布尔值
+        outputs=[chatbot, state, user_input, cost_display]
     )
 
     def handle_send_email(email, state):
