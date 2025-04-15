@@ -26,6 +26,7 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 # 全局變數
 conversation = []
 current_step = "步驟零"
+api_cost = 0.0  # 追蹤 API 使用成本
 
 def load_excel_data():
     try:
@@ -72,8 +73,33 @@ def get_category_products(category):
         return product_categories[category]
     return []
 
+# 添加成本計算函數
+def calculate_api_cost(response):
+    global api_cost
+    try:
+        # 獲取輸入和輸出的 token 數量
+        prompt_tokens = response.usage.prompt_tokens
+        completion_tokens = response.usage.completion_tokens
+        
+        # o3-mini-2025-01-31 的定價
+        input_cost_per_1k = 0.0005  # 每 1000 個輸入 token 的價格
+        output_cost_per_1k = 0.0015  # 每 1000 個輸出 token 的價格
+        
+        # 計算本次請求的成本
+        input_cost = (prompt_tokens / 1000) * input_cost_per_1k
+        output_cost = (completion_tokens / 1000) * output_cost_per_1k
+        total_cost = input_cost + output_cost
+        
+        # 更新總成本
+        api_cost += total_cost
+        
+        return total_cost, api_cost
+    except Exception as e:
+        logging.error(f"計算 API 成本時發生錯誤: {str(e)}")
+        return 0.0, api_cost
+
 def query_chatgpt(user_input, state, email):
-    global conversation, current_step
+    global conversation, current_step, api_cost
     
     try:
         # 基礎系統提示
@@ -194,8 +220,15 @@ def query_chatgpt(user_input, state, email):
             ]
         )
 
-        reply = response['choices'][0]['message']['content']
+        # 計算本次請求的成本
+        current_cost, total_cost = calculate_api_cost(response)
+        
+        reply = response.choices[0].message.content
         conversation.append({"role": "assistant", "content": reply})
+
+        # 添加成本信息到回覆中
+        cost_info = f"\n\n[本次請求成本: ${current_cost:.4f} | 累計成本: ${total_cost:.4f}]"
+        reply += cost_info
 
         # --- 新增：保存對話紀錄 ---
         try:
@@ -589,6 +622,17 @@ with gr.Blocks(
         box-shadow: 0 2px 5px rgba(0,0,0,0.05);
         height: fit-content;
     }
+
+    /* 成本顯示區域樣式 */
+    .cost-display {
+        background: #f8f9fa;
+        padding: 10px;
+        border-radius: 5px;
+        margin: 10px 0;
+        text-align: right;
+        font-size: 0.9em;
+        color: #666;
+    }
     """
 ) as demo:
     with gr.Row(elem_classes="header"):
@@ -649,6 +693,13 @@ with gr.Blocks(
                 elem_classes="qr-code-label"
             )
     
+    # 添加成本顯示區域
+    with gr.Row():
+        cost_display = gr.Markdown(
+            "API 使用成本: $0.0000",
+            elem_classes="cost-display"
+        )
+    
     # 修改處理輸入的函數，使用戶訊息立即顯示
     def process_input(user_input, chatbot, state, email):
         if not user_input.strip():
@@ -663,13 +714,15 @@ with gr.Blocks(
     # 添加一個新函數來處理 API 響應
     def process_response(chatbot, state, last_user_input, email):
         if not chatbot or not last_user_input:
-            return chatbot, state, ""  # 修改返回值，確保輸入框為空
+            return chatbot, state, ""
             
         loading_indicator.visible = True
         
         try:
-            # 呼叫原有的 query_chatgpt 函數處理對話
             chat_history, updated_state = query_chatgpt(last_user_input, state, email)
+            
+            # 更新成本顯示
+            cost_display.value = f"API 使用成本: ${api_cost:.4f}"
             
             # 從 chat_history 中獲取 AI 回應
             ai_response = "無法獲取回應"
