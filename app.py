@@ -309,11 +309,6 @@ def calculate_api_cost(response, is_new_conversation=False):
         prompt_tokens = response.usage.prompt_tokens
         completion_tokens = response.usage.completion_tokens
         
-        # 如果是新對話，加入系統提示和 Excel 資料的 tokens
-        if is_new_conversation:
-            prompt_tokens += system_tokens + excel_tokens
-            logging.info(f"新對話 - 加入基礎 tokens: 系統提示({system_tokens}) + Excel資料({excel_tokens})")
-        
         # o3-mini-2025-01-31 的定價
         input_cost_per_1k = 0.0005  # 每 1000 個輸入 token 的價格
         output_cost_per_1k = 0.0015  # 每 1000 個輸出 token 的價格
