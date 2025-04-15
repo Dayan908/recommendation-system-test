@@ -411,29 +411,39 @@ def calculate_api_cost(response, is_new_conversation=False):
         logging.error(f"計算 API 成本時發生錯誤: {str(e)}")
         return 0.0, api_cost
 
+# 添加全局變數追蹤是否已加載系統提示
+system_prompt_loaded = False
+
 def query_chatgpt(user_input, state, email):
-    global conversation, current_step, api_cost
+    global conversation, current_step, api_cost, system_prompt_loaded
     
     # 判斷是否是新對話
     is_new_conversation = (
         "你好" in user_input or 
         "開始" in user_input or 
         "重新" in user_input or
-        len(conversation) == 0
+        len(conversation) == 0 or
+        not system_prompt_loaded
     )
     
     try:
         # 如果是新對話，清空對話歷史
         if is_new_conversation:
             conversation = []
+            system_prompt_loaded = False
             logging.info(f"開始新對話 - 基礎 tokens: 系統提示({system_tokens}) + Excel資料({excel_tokens}) = {system_tokens + excel_tokens}")
         
         # 限制對話歷史長度，只保留最近的 10 輪對話
         if len(conversation) > 20:  # 每輪對話包含 user 和 assistant 各一條消息
+            # 保留系統提示消息，只清理用戶和助手的對話
+            system_message = conversation[0] if conversation and conversation[0]["role"] == "system" else None
             conversation = conversation[-20:]
+            # 如果原本有系統提示但被清理掉了，重新添加
+            if system_message and (not conversation or conversation[0]["role"] != "system"):
+                conversation.insert(0, system_message)
         
-        # 獲取相關產品資訊 - 僅在新對話時使用
-        if is_new_conversation:
+        # 只在系統提示未加載時加載
+        if not system_prompt_loaded:
             relevant_products = []
             if "current_category" in state and state["current_category"]:
                 products = product_categories.get(state["current_category"], [])
@@ -469,12 +479,14 @@ def query_chatgpt(user_input, state, email):
             
             # 將系統提示添加為第一條消息
             conversation = [{"role": "system", "content": system_prompt}]
+            system_prompt_loaded = True
             logging.info("已添加系統提示和產品資訊到對話歷史中")
 
         # 添加用戶消息到對話歷史
         conversation.append({"role": "user", "content": user_input})
 
         # 建立消息結構 - 使用整個對話歷史而不是每次都重新添加系統提示
+        logging.info(f"發送請求 - 對話歷史長度: {len(conversation)}")
         response = openai.ChatCompletion.create(
             model="o3-mini-2025-01-31",
             messages=conversation
@@ -1019,8 +1031,9 @@ with gr.Blocks(
         return [("Assistant", result)]
 
     def clear_chat(state):
-        global conversation, api_cost
+        global conversation, api_cost, system_prompt_loaded
         conversation = []
+        system_prompt_loaded = False  # 重置系統提示加載狀態
         state = {
             "step": 0,
             "top_matches": None,
