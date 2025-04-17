@@ -389,9 +389,9 @@ def calculate_api_cost(response, is_new_conversation=False):
             logging.info(f"持續對話 tokens 明細:")
             logging.info(f"- 輸入 tokens: {prompt_tokens}")
         
-        # o3-mini-2025-01-31 的定價 (更新後)
-        input_cost_per_1M = 1.1  # 每 1,000,000 個輸入 token 的價格 ($1.1/1M)
-        output_cost_per_1M = 4.4  # 每 1,000,000 個輸出 token 的價格 ($4.4/1M)
+        # gpt-4.1-mini-2025-04-14 的定價
+        input_cost_per_1M = 0.40  # 每 1,000,000 個輸入 token 的價格 ($0.40/1M)
+        output_cost_per_1M = 1.60  # 每 1,000,000 個輸出 token 的價格 ($1.60/1M)
         
         # 計算本次請求的成本
         input_cost = (prompt_tokens / 1000000) * input_cost_per_1M
