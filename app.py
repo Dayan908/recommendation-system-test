@@ -514,7 +514,7 @@ def query_chatgpt(user_input, state, email):
         # --- 恢復結束 ---
 
         response = openai.ChatCompletion.create(
-            model="o3-mini-2025-01-31",
+            model="gpt-4.1-mini-2025-04-14",
             messages=messages_to_send
         )
 
