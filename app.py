@@ -434,17 +434,10 @@ def query_chatgpt(user_input, state, email):
             logging.info(f"開始新對話 - 基礎 tokens: 系統提示({system_tokens}) + Excel資料({excel_tokens}) = {system_tokens + excel_tokens}")
             logging.info(f"重置系統提示狀態: system_prompt_loaded = {system_prompt_loaded}")
         
-        # 限制對話歷史長度，只保留最近的 10 輪對話
-        if len(conversation) > 20:  # 每輪對話包含 user 和 assistant 各一條消息
-            # 保留系統提示消息，只清理用戶和助手的對話
-            system_message = conversation[0] if conversation and conversation[0]["role"] == "system" else None
-            conversation = conversation[-20:]
-            # 如果原本有系統提示但被清理掉了，重新添加
-            if system_message and (not conversation or conversation[0]["role"] != "system"):
-                conversation.insert(0, system_message)
-                # 確保系統提示標記保持為真
-                system_prompt_loaded = True
-                logging.info("對話歷史截斷，已保留系統提示")
+        # 僅保留系統提示，不限制對話歷史長度
+        if len(conversation) > 0 and conversation[0]["role"] == "system":
+            # 確保系統提示仍然保持為第一條消息
+            logging.info(f"對話繼續，保留系統提示在第一位置")
         
         # 只在系統提示未加載時加載
         if not system_prompt_loaded:
@@ -498,6 +491,7 @@ def query_chatgpt(user_input, state, email):
 
         # 添加用戶消息到對話歷史
         conversation.append({"role": "user", "content": user_input})
+        logging.info(f"添加用戶消息到對話歷史，當前對話長度: {len(conversation)}")
 
         # --- 恢復：始終使用包含系統提示的完整對話歷史 ---
         # 創建一個副本以避免修改原始對話歷史
