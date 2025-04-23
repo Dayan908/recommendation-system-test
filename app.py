@@ -940,7 +940,7 @@ with gr.Blocks(
                     '<div class="loading-spinner">ChatGPT 正在思考回應中...</div>',
                     visible=False
                 )
-                chatbot = gr.Chatbot(height=400, elem_classes="chatbot", show_label=False, value=[("智慧照顧產品推薦專家", "您好！我是智慧照顧產品推薦專家，請問您在尋找哪方面的協助或產品呢？")])
+                chatbot = gr.Chatbot(height=400, elem_classes="chatbot", show_label=False, value=[(None, "您好！我是智慧照顧產品推薦專家，請問您在尋找哪方面的協助或產品呢？")])
             
             # 輸入區域（類似 LINE 的底部輸入框）
             with gr.Box(elem_classes="chat-input-container"):
@@ -1067,7 +1067,7 @@ with gr.Blocks(
         # 不重置 api_cost，因為我們要保留總計費用
         # 顯示歡迎消息
         welcome_message = "您好！我是智慧照顧產品推薦專家，請問您在尋找哪方面的協助或產品呢？"
-        return [("智慧照顧產品推薦專家", welcome_message)], state, ""  # 返回包含歡迎消息的聊天記錄、重置的狀態和空的輸入框
+        return [(None, welcome_message)], state, ""  # 返回包含歡迎消息的聊天記錄、重置的狀態和空的輸入框
     
     send_email_btn.click(
         fn=handle_send_email,
@@ -1084,7 +1084,7 @@ with gr.Blocks(
     # 添加歡迎消息函數
     def show_welcome():
         welcome_message = "您好！我是智慧照顧產品推薦專家，請問您在尋找哪方面的協助或產品呢？"
-        return [("智慧照顧產品推薦專家", welcome_message)]
+        return [(None, welcome_message)]
 
 if __name__ == "__main__":
     demo.launch(
